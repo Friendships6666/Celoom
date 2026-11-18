@@ -1,0 +1,2840 @@
+{
+  "mode": "OFFLINE_SYNTHETIC_ONLY_NOT_A_PAID_CACHE_TEST",
+  "versions": {
+    "dsh": {
+      "name": "@deepseek-ai/dsh",
+      "version": "0.2.2-rc.1",
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/package.json"
+    },
+    "dsh-llm-pi-ai": {
+      "name": "@deepseek-ai/dsh-llm-pi-ai",
+      "version": "0.2.2-rc.1",
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/package.json"
+    },
+    "pi-ai": {
+      "name": "@earendil-works/pi-ai",
+      "version": "1.5.0",
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/package.json"
+    },
+    "openai": {
+      "name": "openai",
+      "version": "7.19.0",
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/openai/package.json"
+    }
+  },
+  "sourceManifest": [
+    {
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js",
+      "lines": "28-33,61-92,184-253,586-608,694-711,1157-1158,1204-1219,1271-1388,1778-1790,1993-2032",
+      "purpose": "DSH raw arguments, durable replay, context and streamSimple call",
+      "sha256": "1a3ae58f9b4493e15459cc5000ec80f21b5d3f4a9dea6ffb6bc28e5b8817ae8a"
+    },
+    {
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/models.js",
+      "lines": "427-474",
+      "purpose": "Actual Models auth/header/context dispatch",
+      "sha256": "b2730ffa727d4a19a212172d031344fd6e0992082df233952233a15116824ac4"
+    },
+    {
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js",
+      "lines": "53-102,133-159,194-205,207-309",
+      "purpose": "Cache, compatibility, fetch, request params, reasoning",
+      "sha256": "904b218cb90ab1d2a3ba98ef1f2791660484e8444d358601d33156949b121b2b"
+    },
+    {
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js",
+      "lines": "12-57,91-118,169-332,337-369,466-484,626-646",
+      "purpose": "Actual converter ordering/empty content/signature/strict semantics",
+      "sha256": "00796997da00cd4cb77ae8c1c4bb92a3d4a4a4dd5bea18524de7173e4f877e4c"
+    },
+    {
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/api/transform-messages.js",
+      "lines": "85-127,138-211",
+      "purpose": "Same-model reasoning/text fidelity and missing tool outputs",
+      "sha256": "5654d81fdacdf3f3e9ca9eb89c4dfa71b742b852163ecd49ba38307f876db63e"
+    },
+    {
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/api/simple-options.js",
+      "lines": "18-42",
+      "purpose": "Simple options forwarding and default token cap",
+      "sha256": "ff234becff46a6c25c1e437c86d72fbe7aeb4e107266d1bf6951622d223b0ae0"
+    },
+    {
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/utils/identity.js",
+      "lines": "37-45,65-99",
+      "purpose": "Pi user agent and provider attribution",
+      "sha256": "32b45824054a8a6125a7f3caedd9ff1c594f1a109fd2af4fa1b5729f4578ab62"
+    },
+    {
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-llm/lib/index.js",
+      "lines": "372-387,841-878",
+      "purpose": "DSH loop-request WeakSet marker and user-agent attribution",
+      "sha256": "8e541fc98a11897706a122fde1db42f8b2a41b3b354ba3fcb932e9a16929ac6a"
+    },
+    {
+      "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/openai/internal/request-options.js",
+      "lines": "25-51",
+      "purpose": "Actual SDK JSON stringify",
+      "sha256": "4c404d9fca06f76cb44471900336ca60e2950d461c1998a6010c9279bb078a65"
+    }
+  ],
+  "headerObservations": {
+    "dsh": {
+      "accept": "application/json",
+      "authorization": "<present; value never saved>",
+      "content-type": "application/json",
+      "session_id": "<present; not on static-value allowlist>",
+      "user-agent": "deepseek-harness/0.2.2-rc.1 (+https://github.com/deepseek-ai/deepseek-harness)",
+      "x-client-request-id": "<present; not on static-value allowlist>",
+      "x-stainless-arch": "x64",
+      "x-stainless-lang": "js",
+      "x-stainless-os": "Linux",
+      "x-stainless-package-version": "7.19.0",
+      "x-stainless-retry-count": "0",
+      "x-stainless-runtime": "node",
+      "x-stainless-runtime-version": "v26.11.1"
+    },
+    "nativeSDK": {
+      "accept": "application/json",
+      "authorization": "<present; value never saved>",
+      "content-type": "application/json",
+      "user-agent": "OpenAI/JS 7.19.0",
+      "x-stainless-arch": "x64",
+      "x-stainless-lang": "js",
+      "x-stainless-os": "Linux",
+      "x-stainless-package-version": "7.19.0",
+      "x-stainless-retry-count": "0",
+      "x-stainless-runtime": "node",
+      "x-stainless-runtime-version": "v26.11.1"
+    },
+    "directPiWithDshOptions": {
+      "accept": "application/json",
+      "authorization": "<present; value never saved>",
+      "content-type": "application/json",
+      "session_id": "<present; not on static-value allowlist>",
+      "user-agent": "deepseek-harness/0.2.2-rc.1 (+https://github.com/deepseek-ai/deepseek-harness)",
+      "x-client-request-id": "<present; not on static-value allowlist>",
+      "x-stainless-arch": "x64",
+      "x-stainless-lang": "js",
+      "x-stainless-os": "Linux",
+      "x-stainless-package-version": "7.19.0",
+      "x-stainless-retry-count": "0",
+      "x-stainless-runtime": "node",
+      "x-stainless-runtime-version": "v26.11.1"
+    },
+    "nosafeDefault": {
+      "accept": "application/json",
+      "authorization": "<present; value never saved>",
+      "content-type": "application/json",
+      "session_id": "<present; not on static-value allowlist>",
+      "user-agent": "deepseek-harness/0.2.2-rc.1 (+https://github.com/deepseek-ai/deepseek-harness)",
+      "x-client-request-id": "<present; not on static-value allowlist>",
+      "x-stainless-arch": "x64",
+      "x-stainless-lang": "js",
+      "x-stainless-os": "Linux",
+      "x-stainless-package-version": "7.19.0",
+      "x-stainless-retry-count": "0",
+      "x-stainless-runtime": "node",
+      "x-stainless-runtime-version": "v26.11.1"
+    },
+    "markedAgentLoopRequestSameHeaders": true,
+    "externalHeaderWaterfallNotRun": "PiAiAdapter.prepareHeaders omitted: no live ctx/plugin hooks executed. markAgentLoopRequest only adds WeakSet identity and did not change body/default headers in this adapter. Real deployment plugins may still contribute headers.",
+    "differences": [
+      {
+        "path": "$.session_id",
+        "dsh": "<present; not on static-value allowlist>",
+        "native": "<absent>"
+      },
+      {
+        "path": "$.user-agent",
+        "dsh": "deepseek-harness/0.2.2-rc.1 (+https://github.com/deepseek-ai/deepseek-harness)",
+        "native": "OpenAI/JS 7.19.0"
+      },
+      {
+        "path": "$.x-client-request-id",
+        "dsh": "<present; not on static-value allowlist>",
+        "native": "<absent>"
+      }
+    ],
+    "interpretation": "Same body does not imply equal HTTP headers. DSH user-agent wins over pi identity; native SDK-only default user-agent/x-stainless are captured, not guessed. originator and provider attribution are absent unless shown. Auth values are never persisted. Session header values are redacted even though synthetic.",
+    "paidABProposalOnly": [
+      "Hold exact body, credential, endpoint, session/cache keys, tool schemas and reasoning state fixed; alternate only captured static user-agent.",
+      "Hold body fixed; compare SDK x-stainless header group present vs absent.",
+      "Only if measured header exists, alternate originator/provider-attribution separately; do not invent a claim it exists."
+    ]
+  },
+  "guardSelfTests": [
+    "nonlocalhost mock URL rejected before request handling",
+    "real socket path rejected synchronously"
+  ],
+  "originalArgumentsNativeContrast": {
+    "structuralDiffs": [
+      {
+        "path": "$.input[4].arguments",
+        "dsh": "{\"index\":0,\"label\":\"synthetic-0-0\"}",
+        "native": "{\n  \"index\" : 0,\n  \"label\" : \"synthetic-0-0\"\n}"
+      },
+      {
+        "path": "$.input[5].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[6].arguments",
+        "dsh": "{\"index\":2,\"label\":\"synthetic-0-2\"}",
+        "native": "{\n  \"index\" : 2,\n  \"label\" : \"synthetic-0-2\"\n}"
+      },
+      {
+        "path": "$.input[8].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[9].arguments",
+        "dsh": "{\"index\":4,\"label\":\"synthetic-0-4\"}",
+        "native": "{\n  \"index\" : 4,\n  \"label\" : \"synthetic-0-4\"\n}"
+      },
+      {
+        "path": "$.input[10].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[20].arguments",
+        "dsh": "{\"index\":6,\"label\":\"synthetic-1-0\"}",
+        "native": "{\n  \"index\" : 6,\n  \"label\" : \"synthetic-1-0\"\n}"
+      },
+      {
+        "path": "$.input[21].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[22].arguments",
+        "dsh": "{\"index\":8,\"label\":\"synthetic-1-2\"}",
+        "native": "{\n  \"index\" : 8,\n  \"label\" : \"synthetic-1-2\"\n}"
+      },
+      {
+        "path": "$.input[24].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[25].arguments",
+        "dsh": "{\"index\":10,\"label\":\"synthetic-1-4\"}",
+        "native": "{\n  \"index\" : 10,\n  \"label\" : \"synthetic-1-4\"\n}"
+      },
+      {
+        "path": "$.input[26].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[36].arguments",
+        "dsh": "{\"index\":12,\"label\":\"synthetic-2-0\"}",
+        "native": "{\n  \"index\" : 12,\n  \"label\" : \"synthetic-2-0\"\n}"
+      },
+      {
+        "path": "$.input[37].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[38].arguments",
+        "dsh": "{\"index\":14,\"label\":\"synthetic-2-2\"}",
+        "native": "{\n  \"index\" : 14,\n  \"label\" : \"synthetic-2-2\"\n}"
+      },
+      {
+        "path": "$.input[40].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[41].arguments",
+        "dsh": "{\"index\":16,\"label\":\"synthetic-2-4\"}",
+        "native": "{\n  \"index\" : 16,\n  \"label\" : \"synthetic-2-4\"\n}"
+      },
+      {
+        "path": "$.input[42].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[52].arguments",
+        "dsh": "{\"index\":18,\"label\":\"synthetic-3-0\"}",
+        "native": "{\n  \"index\" : 18,\n  \"label\" : \"synthetic-3-0\"\n}"
+      },
+      {
+        "path": "$.input[53].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[54].arguments",
+        "dsh": "{\"index\":20,\"label\":\"synthetic-3-2\"}",
+        "native": "{\n  \"index\" : 20,\n  \"label\" : \"synthetic-3-2\"\n}"
+      },
+      {
+        "path": "$.input[56].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[57].arguments",
+        "dsh": "{\"index\":22,\"label\":\"synthetic-3-4\"}",
+        "native": "{\n  \"index\" : 22,\n  \"label\" : \"synthetic-3-4\"\n}"
+      },
+      {
+        "path": "$.input[58].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[69].arguments",
+        "dsh": "{\"index\":24,\"label\":\"synthetic-4-0\"}",
+        "native": "{\n  \"index\" : 24,\n  \"label\" : \"synthetic-4-0\"\n}"
+      },
+      {
+        "path": "$.input[70].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[71].arguments",
+        "dsh": "{\"index\":26,\"label\":\"synthetic-4-2\"}",
+        "native": "{\n  \"index\" : 26,\n  \"label\" : \"synthetic-4-2\"\n}"
+      },
+      {
+        "path": "$.input[73].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[74].arguments",
+        "dsh": "{\"index\":28,\"label\":\"synthetic-4-4\"}",
+        "native": "{\n  \"index\" : 28,\n  \"label\" : \"synthetic-4-4\"\n}"
+      },
+      {
+        "path": "$.input[75].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[85].arguments",
+        "dsh": "{\"index\":30,\"label\":\"synthetic-5-0\"}",
+        "native": "{\n  \"index\" : 30,\n  \"label\" : \"synthetic-5-0\"\n}"
+      },
+      {
+        "path": "$.input[86].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[87].arguments",
+        "dsh": "{\"index\":32,\"label\":\"synthetic-5-2\"}",
+        "native": "{\n  \"index\" : 32,\n  \"label\" : \"synthetic-5-2\"\n}"
+      },
+      {
+        "path": "$.input[89].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[90].arguments",
+        "dsh": "{\"index\":34,\"label\":\"synthetic-5-4\"}",
+        "native": "{\n  \"index\" : 34,\n  \"label\" : \"synthetic-5-4\"\n}"
+      },
+      {
+        "path": "$.input[91].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[101].arguments",
+        "dsh": "{\"index\":36,\"label\":\"synthetic-6-0\"}",
+        "native": "{\n  \"index\" : 36,\n  \"label\" : \"synthetic-6-0\"\n}"
+      },
+      {
+        "path": "$.input[102].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[103].arguments",
+        "dsh": "{\"index\":38,\"label\":\"synthetic-6-2\"}",
+        "native": "{\n  \"index\" : 38,\n  \"label\" : \"synthetic-6-2\"\n}"
+      },
+      {
+        "path": "$.input[105].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[106].arguments",
+        "dsh": "{\"index\":40,\"label\":\"synthetic-6-4\"}",
+        "native": "{\n  \"index\" : 40,\n  \"label\" : \"synthetic-6-4\"\n}"
+      },
+      {
+        "path": "$.input[107].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[117].arguments",
+        "dsh": "{\"index\":42,\"label\":\"synthetic-7-0\"}",
+        "native": "{\n  \"index\" : 42,\n  \"label\" : \"synthetic-7-0\"\n}"
+      },
+      {
+        "path": "$.input[118].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[119].arguments",
+        "dsh": "{\"index\":44,\"label\":\"synthetic-7-2\"}",
+        "native": "{\n  \"index\" : 44,\n  \"label\" : \"synthetic-7-2\"\n}"
+      },
+      {
+        "path": "$.input[121].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      },
+      {
+        "path": "$.input[122].arguments",
+        "dsh": "{\"index\":46,\"label\":\"synthetic-7-4\"}",
+        "native": "{\n  \"index\" : 46,\n  \"label\" : \"synthetic-7-4\"\n}"
+      },
+      {
+        "path": "$.input[123].arguments",
+        "dsh": "{}",
+        "native": "{ \n }"
+      }
+    ],
+    "note": "Original whitespace preserved in separate native contrast, intentionally not equivalent to DSH. JSON values are equal."
+  },
+  "callChain": "installed PiAiAdapter.streamWithSnapshot -> actual DSH context/replay/profileOptions -> actual pi-ai Models.streamSimple -> installed Responses.streamSimple/convertResponsesMessages -> installed OpenAI SDK -> supplied/global mockFetch -> synthetic Response SSE",
+  "substitutions": [
+    "synthetic model/profile snapshot only; catalog/profile resolution not run",
+    "in-memory auth with explicit dummy key and empty env",
+    "supplied fetch injected at provider boundary and global fetch replaced; actual SDK JSON serialization retained",
+    "socket/http/http2/dgram disabled; no server; no proxy env changes"
+  ],
+  "primary": "gpt6sol-long",
+  "fixtureSize": {
+    "keys": [
+      "model",
+      "input",
+      "stream",
+      "prompt_cache_key",
+      "prompt_cache_retention",
+      "store",
+      "max_output_tokens",
+      "tools",
+      "reasoning",
+      "include"
+    ],
+    "bytes": 29571,
+    "inputCounts": {
+      "developer": 1,
+      "user": 11,
+      "reasoning": 8,
+      "function_call": 48,
+      "message": 16,
+      "function_call_output": 48
+    },
+    "firstItem": {
+      "role": "developer",
+      "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+    },
+    "reasoning": {
+      "effort": "high",
+      "summary": "auto"
+    },
+    "include": [
+      "reasoning.encrypted_content"
+    ],
+    "cacheRetention": "24h",
+    "strict": [
+      "<absent>",
+      "<absent>"
+    ]
+  },
+  "sanitizedNosafeDefault": {
+    "provenance": "Parent supplied sanitized config facts in message; no profile/config/runtime read. Parent endpoint https://api.nosafe.ai/v1 replaced by loopback URL before all mock calls.",
+    "materialization": "Custom provider nosafe has no builtin catalog; declared reasoningEfforts materialize model.reasoning/thinkingLevelMap. Absent model/provider maxTokens -> installed default128000 (adapter lines694-711,1157-1158). No synthetic long retention applied to these cases.",
+    "models": {
+      "gpt-6.1-sol": {
+        "materializedModel": {
+          "id": "gpt-6.1-sol",
+          "name": "gpt-6.1-sol",
+          "api": "openai-responses",
+          "provider": "nosafe",
+          "baseUrl": "http://127.0.0.1:1/v1",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": null,
+            "max": null
+          }
+        },
+        "capturedBodySummary": {
+          "keys": [
+            "model",
+            "input",
+            "stream",
+            "prompt_cache_key",
+            "store",
+            "max_output_tokens",
+            "tools",
+            "reasoning",
+            "include"
+          ],
+          "bytes": 29546,
+          "inputCounts": {
+            "developer": 1,
+            "user": 11,
+            "reasoning": 8,
+            "function_call": 48,
+            "message": 16,
+            "function_call_output": 48
+          },
+          "firstItem": {
+            "role": "developer",
+            "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+          },
+          "reasoning": {
+            "effort": "high",
+            "summary": "auto"
+          },
+          "include": [
+            "reasoning.encrypted_content"
+          ],
+          "cacheRetention": "<absent>",
+          "strict": [
+            "<absent>",
+            "<absent>"
+          ]
+        }
+      },
+      "deepseek-v4.1-flash-abliterated": {
+        "materializedModel": {
+          "id": "deepseek-v4.1-flash-abliterated",
+          "name": "deepseek-v4.1-flash-abliterated",
+          "api": "openai-responses",
+          "provider": "nosafe",
+          "baseUrl": "http://127.0.0.1:1/v1",
+          "reasoning": true,
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "contextWindow": 258400,
+          "maxTokens": 128000,
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": null,
+            "max": null
+          }
+        },
+        "capturedBodySummary": {
+          "keys": [
+            "model",
+            "input",
+            "stream",
+            "prompt_cache_key",
+            "store",
+            "max_output_tokens",
+            "tools",
+            "reasoning",
+            "include"
+          ],
+          "bytes": 29566,
+          "inputCounts": {
+            "developer": 1,
+            "user": 11,
+            "reasoning": 8,
+            "function_call": 48,
+            "message": 16,
+            "function_call_output": 48
+          },
+          "firstItem": {
+            "role": "developer",
+            "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+          },
+          "reasoning": {
+            "effort": "high",
+            "summary": "auto"
+          },
+          "include": [
+            "reasoning.encrypted_content"
+          ],
+          "cacheRetention": "<absent>",
+          "strict": [
+            "<absent>",
+            "<absent>"
+          ]
+        }
+      }
+    },
+    "markedRequestBodyEqual": true
+  },
+  "nativeEquivalent": {
+    "structuralDiffs": [],
+    "rawBytesEqual": true,
+    "fields": {
+      "model": {
+        "equal": true,
+        "dsh": "gpt6sol",
+        "native": "gpt6sol"
+      },
+      "input": {
+        "equal": true,
+        "dsh": {
+          "count": 132,
+          "sha256": "169d8119e40edcd569a633764c0b213ad9ad00829d7b94d17527a88ed0e350e2"
+        },
+        "native": {
+          "count": 132,
+          "sha256": "169d8119e40edcd569a633764c0b213ad9ad00829d7b94d17527a88ed0e350e2"
+        }
+      },
+      "instructions": {
+        "equal": true,
+        "dsh": "<absent>",
+        "native": "<absent>"
+      },
+      "stream": {
+        "equal": true,
+        "dsh": true,
+        "native": true
+      },
+      "store": {
+        "equal": true,
+        "dsh": false,
+        "native": false
+      },
+      "tools": {
+        "equal": true,
+        "dsh": [
+          {
+            "type": "function",
+            "name": "lab_lookup",
+            "description": "Synthetic lookup. Never executed.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index"
+              ]
+            }
+          },
+          {
+            "type": "function",
+            "name": "lab_empty",
+            "description": "Synthetic no-argument operation. Never executed.",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        ],
+        "native": [
+          {
+            "type": "function",
+            "name": "lab_lookup",
+            "description": "Synthetic lookup. Never executed.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "index"
+              ]
+            }
+          },
+          {
+            "type": "function",
+            "name": "lab_empty",
+            "description": "Synthetic no-argument operation. Never executed.",
+            "parameters": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        ]
+      },
+      "tool_choice": {
+        "equal": true,
+        "dsh": "<absent>",
+        "native": "<absent>"
+      },
+      "reasoning": {
+        "equal": true,
+        "dsh": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "native": {
+          "effort": "high",
+          "summary": "auto"
+        }
+      },
+      "include": {
+        "equal": true,
+        "dsh": [
+          "reasoning.encrypted_content"
+        ],
+        "native": [
+          "reasoning.encrypted_content"
+        ]
+      },
+      "max_output_tokens": {
+        "equal": true,
+        "dsh": 4096,
+        "native": 4096
+      },
+      "prompt_cache_key": {
+        "equal": true,
+        "dsh": "cache-lab-static-session",
+        "native": "cache-lab-static-session"
+      },
+      "prompt_cache_retention": {
+        "equal": true,
+        "dsh": "24h",
+        "native": "24h"
+      },
+      "prompt_cache_options": {
+        "equal": true,
+        "dsh": "<absent>",
+        "native": "<absent>"
+      },
+      "previous_response_id": {
+        "equal": true,
+        "dsh": "<absent>",
+        "native": "<absent>"
+      },
+      "temperature": {
+        "equal": true,
+        "dsh": "<absent>",
+        "native": "<absent>"
+      }
+    },
+    "limitation": "Positive control: native SDK reuses captured non-input top-level fields; input/tools rebuilt with real converters. Not an independent cache-efficiency experiment."
+  },
+  "cases": {
+    "gpt6sol-default": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 29540,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.prompt_cache_retention"
+      ]
+    },
+    "gpt6sol-long": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "prompt_cache_retention",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 29571,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "24h",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": []
+    },
+    "deepseekflash-default": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 29546,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.model",
+        "$.prompt_cache_retention"
+      ]
+    },
+    "deepseekflash-long": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "prompt_cache_retention",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 29577,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "24h",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.model"
+      ]
+    },
+    "nosafe-gpt-6.1-sol-default": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 29546,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.model",
+        "$.prompt_cache_retention",
+        "$.max_output_tokens"
+      ]
+    },
+    "nosafe-deepseek-v4.1-flash-abliterated-default": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 29566,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.model",
+        "$.prompt_cache_retention",
+        "$.max_output_tokens"
+      ]
+    },
+    "gpt6sol-none": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 29494,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.prompt_cache_key",
+        "$.prompt_cache_retention"
+      ]
+    },
+    "gpt6sol-strict-supported": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 29570,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "<absent>",
+        "strict": [
+          false,
+          false
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.prompt_cache_retention",
+        "$.tools[0].strict",
+        "$.tools[1].strict"
+      ]
+    },
+    "gpt6sol-nonreasoning": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools"
+        ],
+        "bytes": 29448,
+        "inputCounts": {
+          "system": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "system",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": "<absent>",
+        "include": "<absent>",
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.input[0].role",
+        "$.prompt_cache_retention",
+        "$.reasoning",
+        "$.include"
+      ]
+    },
+    "gpt6sol-reasoning-default": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning"
+        ],
+        "bytes": 29481,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "none"
+        },
+        "include": "<absent>",
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.prompt_cache_retention",
+        "$.reasoning.effort",
+        "$.reasoning.summary",
+        "$.include"
+      ]
+    },
+    "gpt6sol-reasoning-off": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning"
+        ],
+        "bytes": 29481,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "none"
+        },
+        "include": "<absent>",
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.prompt_cache_retention",
+        "$.reasoning.effort",
+        "$.reasoning.summary",
+        "$.include"
+      ]
+    },
+    "gpt6sol-long-unsupported": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 29540,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 8,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.prompt_cache_retention"
+      ]
+    },
+    "gpt6sol-foreign-history": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 28466,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.input[3].type",
+        "$.input[3].id",
+        "$.input[3].summary",
+        "$.input[3].encrypted_content",
+        "$.input[3].call_id",
+        "$.input[3].name",
+        "$.input[3].arguments",
+        "$.input[4].id",
+        "$.input[4].call_id",
+        "$.input[4].name",
+        "$.input[4].arguments",
+        "$.input[5].id",
+        "$.input[5].call_id",
+        "$.input[5].name",
+        "$.input[5].arguments",
+        "$.input[6].type",
+        "$.input[6].id",
+        "$.input[6].call_id",
+        "$.input[6].name",
+        "$.input[6].arguments",
+        "$.input[6].role",
+        "$.input[6].content",
+        "$.input[6].status",
+        "$.input[7].type",
+        "$.input[7].role",
+        "$.input[7].content",
+        "$.input[7].status",
+        "$.input[7].id",
+        "$.input[7].phase",
+        "$.input[7].call_id",
+        "$.input[7].name",
+        "$.input[7].arguments",
+        "$.input[8].id",
+        "$.input[8].call_id",
+        "$.input[8].name",
+        "$.input[8].arguments",
+        "$.input[9].id",
+        "$.input[9].call_id",
+        "$.input[9].name",
+        "$.input[9].arguments",
+        "$.input[10].type",
+        "$.input[10].id",
+        "$.input[10].call_id",
+        "$.input[10].name",
+        "$.input[10].arguments",
+        "$.input[10].role",
+        "$.input[10].content",
+        "$.input[10].status",
+        "$.input[11].type",
+        "$.input[11].role",
+        "$.input[11].content",
+        "$.input[11].status",
+        "$.input[11].id",
+        "$.input[11].call_id",
+        "$.input[11].output",
+        "$.input[12].call_id",
+        "$.input[12].output",
+        "$.input[13].call_id",
+        "$.input[13].output",
+        "$.input[14].call_id",
+        "$.input[14].output",
+        "$.input[15].call_id",
+        "$.input[15].output",
+        "$.input[16].call_id",
+        "$.input[16].output",
+        "$.input[17].type",
+        "$.input[17].call_id",
+        "$.input[17].output",
+        "$.input[17].role",
+        "$.input[17].content",
+        "$.input[18].role",
+        "$.input[18].content",
+        "$.input[18].type",
+        "$.input[18].call_id",
+        "$.input[18].name",
+        "$.input[18].arguments",
+        "$.input[19].type",
+        "$.input[19].id",
+        "$.input[19].summary",
+        "$.input[19].encrypted_content",
+        "$.input[19].call_id",
+        "$.input[19].name",
+        "$.input[19].arguments",
+        "$.input[20].id",
+        "$.input[20].call_id",
+        "$.input[20].arguments",
+        "$.input[21].type",
+        "$.input[21].id",
+        "$.input[21].call_id",
+        "$.input[21].name",
+        "$.input[21].arguments",
+        "$.input[21].role",
+        "$.input[21].content",
+        "$.input[21].status",
+        "$.input[22].id",
+        "$.input[22].call_id",
+        "$.input[22].name",
+        "$.input[22].arguments",
+        "$.input[23].type",
+        "$.input[23].role",
+        "$.input[23].content",
+        "$.input[23].status",
+        "$.input[23].id",
+        "$.input[23].phase",
+        "$.input[23].call_id",
+        "$.input[23].name",
+        "$.input[23].arguments",
+        "$.input[24].id",
+        "$.input[24].call_id",
+        "$.input[25].type",
+        "$.input[25].id",
+        "$.input[25].call_id",
+        "$.input[25].name",
+        "$.input[25].arguments",
+        "$.input[25].role",
+        "$.input[25].content",
+        "$.input[25].status",
+        "$.input[26].type",
+        "$.input[26].id",
+        "$.input[26].call_id",
+        "$.input[26].name",
+        "$.input[26].arguments",
+        "$.input[26].output",
+        "$.input[27].type",
+        "$.input[27].role",
+        "$.input[27].content",
+        "$.input[27].status",
+        "$.input[27].id",
+        "$.input[27].call_id",
+        "$.input[27].output",
+        "$.input[28].call_id",
+        "$.input[28].output",
+        "$.input[29].call_id",
+        "$.input[29].output",
+        "$.input[30].call_id",
+        "$.input[30].output",
+        "$.input[31].call_id",
+        "$.input[31].output",
+        "$.input[32].type",
+        "$.input[32].call_id",
+        "$.input[32].output",
+        "$.input[32].role",
+        "$.input[32].content",
+        "$.input[33].type",
+        "$.input[33].call_id",
+        "$.input[33].output",
+        "$.input[33].name",
+        "$.input[33].arguments",
+        "$.input[34].role",
+        "$.input[34].content",
+        "$.input[34].type",
+        "$.input[34].call_id",
+        "$.input[34].name",
+        "$.input[34].arguments",
+        "$.input[35].type",
+        "$.input[35].id",
+        "$.input[35].summary",
+        "$.input[35].encrypted_content",
+        "$.input[35].call_id",
+        "$.input[35].name",
+        "$.input[35].arguments",
+        "$.input[36].type",
+        "$.input[36].id",
+        "$.input[36].call_id",
+        "$.input[36].name",
+        "$.input[36].arguments",
+        "$.input[36].role",
+        "$.input[36].content",
+        "$.input[36].status",
+        "$.input[37].id",
+        "$.input[37].call_id",
+        "$.input[38].id",
+        "$.input[38].call_id",
+        "$.input[38].arguments",
+        "$.input[39].type",
+        "$.input[39].role",
+        "$.input[39].content",
+        "$.input[39].status",
+        "$.input[39].id",
+        "$.input[39].phase",
+        "$.input[39].call_id",
+        "$.input[39].name",
+        "$.input[39].arguments",
+        "$.input[40].type",
+        "$.input[40].id",
+        "$.input[40].call_id",
+        "$.input[40].name",
+        "$.input[40].arguments",
+        "$.input[40].role",
+        "$.input[40].content",
+        "$.input[40].status",
+        "$.input[41].type",
+        "$.input[41].id",
+        "$.input[41].call_id",
+        "$.input[41].name",
+        "$.input[41].arguments",
+        "$.input[41].output",
+        "$.input[42].type",
+        "$.input[42].id",
+        "$.input[42].call_id",
+        "$.input[42].name",
+        "$.input[42].arguments",
+        "$.input[42].output",
+        "$.input[43].type",
+        "$.input[43].role",
+        "$.input[43].content",
+        "$.input[43].status",
+        "$.input[43].id",
+        "$.input[43].call_id",
+        "$.input[43].output",
+        "$.input[44].call_id",
+        "$.input[44].output",
+        "$.input[45].call_id",
+        "$.input[45].output",
+        "$.input[46].call_id",
+        "$.input[46].output",
+        "$.input[47].type",
+        "$.input[47].call_id",
+        "$.input[47].output",
+        "$.input[47].role",
+        "$.input[47].content",
+        "$.input[48].type",
+        "$.input[48].call_id",
+        "$.input[48].output",
+        "$.input[48].name",
+        "$.input[48].arguments",
+        "$.input[49].type",
+        "$.input[49].call_id",
+        "$.input[49].output",
+        "$.input[49].name",
+        "$.input[49].arguments",
+        "$.input[50].role",
+        "$.input[50].content",
+        "$.input[50].type",
+        "$.input[50].call_id",
+        "$.input[50].name",
+        "$.input[50].arguments",
+        "$.input[51].type",
+        "$.input[51].id",
+        "$.input[51].summary",
+        "$.input[51].encrypted_content",
+        "$.input[51].role",
+        "$.input[51].content",
+        "$.input[51].status",
+        "$.input[52].id",
+        "$.input[52].call_id",
+        "$.input[52].name",
+        "$.input[52].arguments",
+        "$.input[53].id",
+        "$.input[53].call_id",
+        "$.input[53].name",
+        "$.input[53].arguments",
+        "$.input[54].id",
+        "$.input[54].call_id",
+        "$.input[54].name",
+        "$.input[54].arguments",
+        "$.input[55].content[0].text",
+        "$.input[55].id",
+        "$.input[55].phase",
+        "$.input[56].type",
+        "$.input[56].id",
+        "$.input[56].call_id",
+        "$.input[56].name",
+        "$.input[56].arguments",
+        "$.input[56].output",
+        "$.input[57].type",
+        "$.input[57].id",
+        "$.input[57].call_id",
+        "$.input[57].name",
+        "$.input[57].arguments",
+        "$.input[57].output",
+        "$.input[58].type",
+        "$.input[58].id",
+        "$.input[58].call_id",
+        "$.input[58].name",
+        "$.input[58].arguments",
+        "$.input[58].output",
+        "$.input[59].type",
+        "$.input[59].role",
+        "$.input[59].content",
+        "$.input[59].status",
+        "$.input[59].id",
+        "$.input[59].call_id",
+        "$.input[59].output",
+        "$.input[60].call_id",
+        "$.input[60].output",
+        "$.input[61].call_id",
+        "$.input[61].output",
+        "$.input[62].type",
+        "$.input[62].call_id",
+        "$.input[62].output",
+        "$.input[62].role",
+        "$.input[62].content",
+        "$.input[63].type",
+        "$.input[63].call_id",
+        "$.input[63].output",
+        "$.input[63].role",
+        "$.input[63].content",
+        "$.input[64].type",
+        "$.input[64].call_id",
+        "$.input[64].output",
+        "$.input[64].name",
+        "$.input[64].arguments",
+        "$.input[65].type",
+        "$.input[65].call_id",
+        "$.input[65].output",
+        "$.input[65].name",
+        "$.input[65].arguments",
+        "$.input[66].role",
+        "$.input[66].content",
+        "$.input[66].type",
+        "$.input[66].call_id",
+        "$.input[66].name",
+        "$.input[66].arguments",
+        "$.input[67].role",
+        "$.input[67].content[0].type",
+        "$.input[67].content[0].text",
+        "$.input[67].content[0].annotations",
+        "$.input[67].type",
+        "$.input[67].status",
+        "$.input[67].id",
+        "$.input[68].type",
+        "$.input[68].id",
+        "$.input[68].summary",
+        "$.input[68].encrypted_content",
+        "$.input[68].call_id",
+        "$.input[68].name",
+        "$.input[68].arguments",
+        "$.input[69].id",
+        "$.input[69].call_id",
+        "$.input[69].arguments",
+        "$.input[70].id",
+        "$.input[70].call_id",
+        "$.input[71].type",
+        "$.input[71].id",
+        "$.input[71].call_id",
+        "$.input[71].name",
+        "$.input[71].arguments",
+        "$.input[71].role",
+        "$.input[71].content",
+        "$.input[71].status",
+        "$.input[72].type",
+        "$.input[72].role",
+        "$.input[72].content",
+        "$.input[72].status",
+        "$.input[72].id",
+        "$.input[72].phase",
+        "$.input[72].call_id",
+        "$.input[72].output",
+        "$.input[73].type",
+        "$.input[73].id",
+        "$.input[73].call_id",
+        "$.input[73].name",
+        "$.input[73].arguments",
+        "$.input[73].output",
+        "$.input[74].type",
+        "$.input[74].id",
+        "$.input[74].call_id",
+        "$.input[74].name",
+        "$.input[74].arguments",
+        "$.input[74].output",
+        "$.input[75].type",
+        "$.input[75].id",
+        "$.input[75].call_id",
+        "$.input[75].name",
+        "$.input[75].arguments",
+        "$.input[75].output",
+        "$.input[76].type",
+        "$.input[76].role",
+        "$.input[76].content",
+        "$.input[76].status",
+        "$.input[76].id",
+        "$.input[76].call_id",
+        "$.input[76].output",
+        "$.input[77].call_id",
+        "$.input[77].output",
+        "$.input[78].type",
+        "$.input[78].call_id",
+        "$.input[78].output",
+        "$.input[78].role",
+        "$.input[78].content",
+        "$.input[79].type",
+        "$.input[79].call_id",
+        "$.input[79].output",
+        "$.input[79].name",
+        "$.input[79].arguments",
+        "$.input[80].type",
+        "$.input[80].call_id",
+        "$.input[80].output",
+        "$.input[80].name",
+        "$.input[80].arguments",
+        "$.input[81].type",
+        "$.input[81].call_id",
+        "$.input[81].output",
+        "$.input[81].name",
+        "$.input[81].arguments",
+        "$.input[82].type",
+        "$.input[82].call_id",
+        "$.input[82].output",
+        "$.input[82].role",
+        "$.input[82].content",
+        "$.input[82].status",
+        "$.input[82].id",
+        "$.input[83].role",
+        "$.input[83].content",
+        "$.input[83].type",
+        "$.input[83].call_id",
+        "$.input[83].name",
+        "$.input[83].arguments",
+        "$.input[84].type",
+        "$.input[84].id",
+        "$.input[84].summary",
+        "$.input[84].encrypted_content",
+        "$.input[84].call_id",
+        "$.input[84].name",
+        "$.input[84].arguments",
+        "$.input[85].id",
+        "$.input[85].call_id",
+        "$.input[85].name",
+        "$.input[85].arguments",
+        "$.input[86].type",
+        "$.input[86].id",
+        "$.input[86].call_id",
+        "$.input[86].name",
+        "$.input[86].arguments",
+        "$.input[86].role",
+        "$.input[86].content",
+        "$.input[86].status",
+        "$.input[87].type",
+        "$.input[87].id",
+        "$.input[87].call_id",
+        "$.input[87].name",
+        "$.input[87].arguments",
+        "$.input[87].output",
+        "$.input[88].type",
+        "$.input[88].role",
+        "$.input[88].content",
+        "$.input[88].status",
+        "$.input[88].id",
+        "$.input[88].phase",
+        "$.input[88].call_id",
+        "$.input[88].output",
+        "$.input[89].type",
+        "$.input[89].id",
+        "$.input[89].call_id",
+        "$.input[89].name",
+        "$.input[89].arguments",
+        "$.input[89].output",
+        "$.input[90].type",
+        "$.input[90].id",
+        "$.input[90].call_id",
+        "$.input[90].name",
+        "$.input[90].arguments",
+        "$.input[90].output",
+        "$.input[91].type",
+        "$.input[91].id",
+        "$.input[91].call_id",
+        "$.input[91].name",
+        "$.input[91].arguments",
+        "$.input[91].output",
+        "$.input[92].type",
+        "$.input[92].role",
+        "$.input[92].content",
+        "$.input[92].status",
+        "$.input[92].id",
+        "$.input[92].call_id",
+        "$.input[92].output",
+        "$.input[93].type",
+        "$.input[93].call_id",
+        "$.input[93].output",
+        "$.input[93].role",
+        "$.input[93].content",
+        "$.input[94].type",
+        "$.input[94].call_id",
+        "$.input[94].output",
+        "$.input[94].name",
+        "$.input[94].arguments",
+        "$.input[95].type",
+        "$.input[95].call_id",
+        "$.input[95].output",
+        "$.input[95].name",
+        "$.input[95].arguments",
+        "$.input[96].type",
+        "$.input[96].call_id",
+        "$.input[96].output",
+        "$.input[96].name",
+        "$.input[96].arguments",
+        "$.input[97].type",
+        "$.input[97].call_id",
+        "$.input[97].output",
+        "$.input[97].role",
+        "$.input[97].content",
+        "$.input[97].status",
+        "$.input[97].id",
+        "$.input[98].type",
+        "$.input[98].call_id",
+        "$.input[98].output",
+        "$.input[98].name",
+        "$.input[98].arguments",
+        "$.input[99].role",
+        "$.input[99].content",
+        "$.input[99].type",
+        "$.input[99].call_id",
+        "$.input[99].name",
+        "$.input[99].arguments",
+        "$.input[100].type",
+        "$.input[100].id",
+        "$.input[100].summary",
+        "$.input[100].encrypted_content",
+        "$.input[100].call_id",
+        "$.input[100].name",
+        "$.input[100].arguments",
+        "$.input[101].type",
+        "$.input[101].id",
+        "$.input[101].call_id",
+        "$.input[101].name",
+        "$.input[101].arguments",
+        "$.input[101].role",
+        "$.input[101].content",
+        "$.input[101].status",
+        "$.input[102].type",
+        "$.input[102].id",
+        "$.input[102].call_id",
+        "$.input[102].name",
+        "$.input[102].arguments",
+        "$.input[102].output",
+        "$.input[103].type",
+        "$.input[103].id",
+        "$.input[103].call_id",
+        "$.input[103].name",
+        "$.input[103].arguments",
+        "$.input[103].output",
+        "$.input[104].type",
+        "$.input[104].role",
+        "$.input[104].content",
+        "$.input[104].status",
+        "$.input[104].id",
+        "$.input[104].phase",
+        "$.input[104].call_id",
+        "$.input[104].output",
+        "$.input[105].type",
+        "$.input[105].id",
+        "$.input[105].call_id",
+        "$.input[105].name",
+        "$.input[105].arguments",
+        "$.input[105].output",
+        "$.input[106].type",
+        "$.input[106].id",
+        "$.input[106].call_id",
+        "$.input[106].name",
+        "$.input[106].arguments",
+        "$.input[106].output",
+        "$.input[107].type",
+        "$.input[107].id",
+        "$.input[107].call_id",
+        "$.input[107].name",
+        "$.input[107].arguments",
+        "$.input[107].output",
+        "$.input[108].type",
+        "$.input[108].role",
+        "$.input[108].content[0].type",
+        "$.input[108].content[0].text",
+        "$.input[108].content[0].annotations",
+        "$.input[108].status",
+        "$.input[108].id",
+        "$.input[109].type",
+        "$.input[109].call_id",
+        "$.input[109].output",
+        "$.input[109].name",
+        "$.input[109].arguments",
+        "$.input[110].type",
+        "$.input[110].call_id",
+        "$.input[110].output",
+        "$.input[110].name",
+        "$.input[110].arguments",
+        "$.input[111].type",
+        "$.input[111].call_id",
+        "$.input[111].output",
+        "$.input[111].name",
+        "$.input[111].arguments",
+        "$.input[112].type",
+        "$.input[112].call_id",
+        "$.input[112].output",
+        "$.input[112].role",
+        "$.input[112].content",
+        "$.input[112].status",
+        "$.input[112].id",
+        "$.input[113].type",
+        "$.input[113].call_id",
+        "$.input[113].output",
+        "$.input[113].name",
+        "$.input[113].arguments",
+        "$.input[114].type",
+        "$.input[114].call_id",
+        "$.input[114].output",
+        "$.input[114].name",
+        "$.input[114].arguments",
+        "$.input[115].role",
+        "$.input[115].content",
+        "$.input[115].type",
+        "$.input[115].call_id",
+        "$.input[115].name",
+        "$.input[115].arguments",
+        "$.input[116].type",
+        "$.input[116].id",
+        "$.input[116].summary",
+        "$.input[116].encrypted_content",
+        "$.input[116].role",
+        "$.input[116].content",
+        "$.input[116].status",
+        "$.input[117].type",
+        "$.input[117].id",
+        "$.input[117].call_id",
+        "$.input[117].name",
+        "$.input[117].arguments",
+        "$.input[117].output",
+        "$.input[118].type",
+        "$.input[118].id",
+        "$.input[118].call_id",
+        "$.input[118].name",
+        "$.input[118].arguments",
+        "$.input[118].output",
+        "$.input[119].type",
+        "$.input[119].id",
+        "$.input[119].call_id",
+        "$.input[119].name",
+        "$.input[119].arguments",
+        "$.input[119].output",
+        "$.input[120].type",
+        "$.input[120].role",
+        "$.input[120].content",
+        "$.input[120].status",
+        "$.input[120].id",
+        "$.input[120].phase",
+        "$.input[120].call_id",
+        "$.input[120].output",
+        "$.input[121].type",
+        "$.input[121].id",
+        "$.input[121].call_id",
+        "$.input[121].name",
+        "$.input[121].arguments",
+        "$.input[121].output",
+        "$.input[122].type",
+        "$.input[122].id",
+        "$.input[122].call_id",
+        "$.input[122].name",
+        "$.input[122].arguments",
+        "$.input[122].output",
+        "$.input[123].type",
+        "$.input[123].id",
+        "$.input[123].call_id",
+        "$.input[123].name",
+        "$.input[123].arguments",
+        "$.input[123].role",
+        "$.input[123].content",
+        "$.input[124]",
+        "$.input[125]",
+        "$.input[126]",
+        "$.input[127]",
+        "$.input[128]",
+        "$.input[129]",
+        "$.input[130]",
+        "$.input[131]",
+        "$.prompt_cache_retention"
+      ]
+    },
+    "gpt6sol-bad-replay": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 29404,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "function_call": 48,
+          "message": 16,
+          "function_call_output": 48,
+          "reasoning": 7
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.input[3].type",
+        "$.input[3].id",
+        "$.input[3].summary",
+        "$.input[3].encrypted_content",
+        "$.input[3].call_id",
+        "$.input[3].name",
+        "$.input[3].arguments",
+        "$.input[4].id",
+        "$.input[4].call_id",
+        "$.input[4].name",
+        "$.input[4].arguments",
+        "$.input[5].id",
+        "$.input[5].call_id",
+        "$.input[5].name",
+        "$.input[5].arguments",
+        "$.input[6].type",
+        "$.input[6].id",
+        "$.input[6].call_id",
+        "$.input[6].name",
+        "$.input[6].arguments",
+        "$.input[6].role",
+        "$.input[6].content",
+        "$.input[6].status",
+        "$.input[7].type",
+        "$.input[7].role",
+        "$.input[7].content",
+        "$.input[7].status",
+        "$.input[7].id",
+        "$.input[7].phase",
+        "$.input[7].call_id",
+        "$.input[7].name",
+        "$.input[7].arguments",
+        "$.input[8].id",
+        "$.input[8].call_id",
+        "$.input[8].name",
+        "$.input[8].arguments",
+        "$.input[9].id",
+        "$.input[9].call_id",
+        "$.input[9].name",
+        "$.input[9].arguments",
+        "$.input[10].type",
+        "$.input[10].id",
+        "$.input[10].call_id",
+        "$.input[10].name",
+        "$.input[10].arguments",
+        "$.input[10].role",
+        "$.input[10].content",
+        "$.input[10].status",
+        "$.input[11].type",
+        "$.input[11].role",
+        "$.input[11].content",
+        "$.input[11].status",
+        "$.input[11].id",
+        "$.input[11].call_id",
+        "$.input[11].output",
+        "$.input[12].call_id",
+        "$.input[12].output",
+        "$.input[13].call_id",
+        "$.input[13].output",
+        "$.input[14].call_id",
+        "$.input[14].output",
+        "$.input[15].call_id",
+        "$.input[15].output",
+        "$.input[16].call_id",
+        "$.input[16].output",
+        "$.input[17].type",
+        "$.input[17].call_id",
+        "$.input[17].output",
+        "$.input[17].role",
+        "$.input[17].content",
+        "$.input[18].role",
+        "$.input[18].content",
+        "$.input[18].type",
+        "$.input[18].id",
+        "$.input[18].summary",
+        "$.input[18].encrypted_content",
+        "$.input[19].type",
+        "$.input[19].id",
+        "$.input[19].summary",
+        "$.input[19].encrypted_content",
+        "$.input[19].call_id",
+        "$.input[19].name",
+        "$.input[19].arguments",
+        "$.input[20].id",
+        "$.input[20].call_id",
+        "$.input[20].name",
+        "$.input[20].arguments",
+        "$.input[21].id",
+        "$.input[21].call_id",
+        "$.input[21].name",
+        "$.input[21].arguments",
+        "$.input[22].type",
+        "$.input[22].id",
+        "$.input[22].call_id",
+        "$.input[22].name",
+        "$.input[22].arguments",
+        "$.input[22].role",
+        "$.input[22].content",
+        "$.input[22].status",
+        "$.input[22].phase",
+        "$.input[23].type",
+        "$.input[23].role",
+        "$.input[23].content",
+        "$.input[23].status",
+        "$.input[23].id",
+        "$.input[23].phase",
+        "$.input[23].call_id",
+        "$.input[23].name",
+        "$.input[23].arguments",
+        "$.input[24].id",
+        "$.input[24].call_id",
+        "$.input[24].name",
+        "$.input[24].arguments",
+        "$.input[25].id",
+        "$.input[25].call_id",
+        "$.input[25].name",
+        "$.input[25].arguments",
+        "$.input[26].type",
+        "$.input[26].id",
+        "$.input[26].call_id",
+        "$.input[26].name",
+        "$.input[26].arguments",
+        "$.input[26].role",
+        "$.input[26].content",
+        "$.input[26].status",
+        "$.input[27].type",
+        "$.input[27].role",
+        "$.input[27].content",
+        "$.input[27].status",
+        "$.input[27].id",
+        "$.input[27].call_id",
+        "$.input[27].output",
+        "$.input[28].call_id",
+        "$.input[28].output",
+        "$.input[29].call_id",
+        "$.input[29].output",
+        "$.input[30].call_id",
+        "$.input[30].output",
+        "$.input[31].call_id",
+        "$.input[31].output",
+        "$.input[32].call_id",
+        "$.input[32].output",
+        "$.input[33].type",
+        "$.input[33].call_id",
+        "$.input[33].output",
+        "$.input[33].role",
+        "$.input[33].content",
+        "$.input[34].role",
+        "$.input[34].content",
+        "$.input[34].type",
+        "$.input[34].id",
+        "$.input[34].summary",
+        "$.input[34].encrypted_content",
+        "$.input[35].type",
+        "$.input[35].id",
+        "$.input[35].summary",
+        "$.input[35].encrypted_content",
+        "$.input[35].call_id",
+        "$.input[35].name",
+        "$.input[35].arguments",
+        "$.input[36].id",
+        "$.input[36].call_id",
+        "$.input[36].name",
+        "$.input[36].arguments",
+        "$.input[37].id",
+        "$.input[37].call_id",
+        "$.input[37].name",
+        "$.input[37].arguments",
+        "$.input[38].type",
+        "$.input[38].id",
+        "$.input[38].call_id",
+        "$.input[38].name",
+        "$.input[38].arguments",
+        "$.input[38].role",
+        "$.input[38].content",
+        "$.input[38].status",
+        "$.input[38].phase",
+        "$.input[39].type",
+        "$.input[39].role",
+        "$.input[39].content",
+        "$.input[39].status",
+        "$.input[39].id",
+        "$.input[39].phase",
+        "$.input[39].call_id",
+        "$.input[39].name",
+        "$.input[39].arguments",
+        "$.input[40].id",
+        "$.input[40].call_id",
+        "$.input[40].name",
+        "$.input[40].arguments",
+        "$.input[41].id",
+        "$.input[41].call_id",
+        "$.input[41].name",
+        "$.input[41].arguments",
+        "$.input[42].type",
+        "$.input[42].id",
+        "$.input[42].call_id",
+        "$.input[42].name",
+        "$.input[42].arguments",
+        "$.input[42].role",
+        "$.input[42].content",
+        "$.input[42].status",
+        "$.input[43].type",
+        "$.input[43].role",
+        "$.input[43].content",
+        "$.input[43].status",
+        "$.input[43].id",
+        "$.input[43].call_id",
+        "$.input[43].output",
+        "$.input[44].call_id",
+        "$.input[44].output",
+        "$.input[45].call_id",
+        "$.input[45].output",
+        "$.input[46].call_id",
+        "$.input[46].output",
+        "$.input[47].call_id",
+        "$.input[47].output",
+        "$.input[48].call_id",
+        "$.input[48].output",
+        "$.input[49].type",
+        "$.input[49].call_id",
+        "$.input[49].output",
+        "$.input[49].role",
+        "$.input[49].content",
+        "$.input[50].role",
+        "$.input[50].content",
+        "$.input[50].type",
+        "$.input[50].id",
+        "$.input[50].summary",
+        "$.input[50].encrypted_content",
+        "$.input[51].type",
+        "$.input[51].id",
+        "$.input[51].summary",
+        "$.input[51].encrypted_content",
+        "$.input[51].call_id",
+        "$.input[51].name",
+        "$.input[51].arguments",
+        "$.input[52].id",
+        "$.input[52].call_id",
+        "$.input[52].name",
+        "$.input[52].arguments",
+        "$.input[53].id",
+        "$.input[53].call_id",
+        "$.input[53].name",
+        "$.input[53].arguments",
+        "$.input[54].type",
+        "$.input[54].id",
+        "$.input[54].call_id",
+        "$.input[54].name",
+        "$.input[54].arguments",
+        "$.input[54].role",
+        "$.input[54].content",
+        "$.input[54].status",
+        "$.input[54].phase",
+        "$.input[55].type",
+        "$.input[55].role",
+        "$.input[55].content",
+        "$.input[55].status",
+        "$.input[55].id",
+        "$.input[55].phase",
+        "$.input[55].call_id",
+        "$.input[55].name",
+        "$.input[55].arguments",
+        "$.input[56].id",
+        "$.input[56].call_id",
+        "$.input[56].name",
+        "$.input[56].arguments",
+        "$.input[57].id",
+        "$.input[57].call_id",
+        "$.input[57].name",
+        "$.input[57].arguments",
+        "$.input[58].type",
+        "$.input[58].id",
+        "$.input[58].call_id",
+        "$.input[58].name",
+        "$.input[58].arguments",
+        "$.input[58].role",
+        "$.input[58].content",
+        "$.input[58].status",
+        "$.input[59].type",
+        "$.input[59].role",
+        "$.input[59].content",
+        "$.input[59].status",
+        "$.input[59].id",
+        "$.input[59].call_id",
+        "$.input[59].output",
+        "$.input[60].call_id",
+        "$.input[60].output",
+        "$.input[61].call_id",
+        "$.input[61].output",
+        "$.input[62].call_id",
+        "$.input[62].output",
+        "$.input[63].call_id",
+        "$.input[63].output",
+        "$.input[64].call_id",
+        "$.input[64].output",
+        "$.input[65].type",
+        "$.input[65].call_id",
+        "$.input[65].output",
+        "$.input[65].role",
+        "$.input[65].content",
+        "$.input[66].content[0].text",
+        "$.input[67].role",
+        "$.input[67].content",
+        "$.input[67].type",
+        "$.input[67].id",
+        "$.input[67].summary",
+        "$.input[67].encrypted_content",
+        "$.input[68].type",
+        "$.input[68].id",
+        "$.input[68].summary",
+        "$.input[68].encrypted_content",
+        "$.input[68].call_id",
+        "$.input[68].name",
+        "$.input[68].arguments",
+        "$.input[69].id",
+        "$.input[69].call_id",
+        "$.input[69].name",
+        "$.input[69].arguments",
+        "$.input[70].id",
+        "$.input[70].call_id",
+        "$.input[70].name",
+        "$.input[70].arguments",
+        "$.input[71].type",
+        "$.input[71].id",
+        "$.input[71].call_id",
+        "$.input[71].name",
+        "$.input[71].arguments",
+        "$.input[71].role",
+        "$.input[71].content",
+        "$.input[71].status",
+        "$.input[71].phase",
+        "$.input[72].type",
+        "$.input[72].role",
+        "$.input[72].content",
+        "$.input[72].status",
+        "$.input[72].id",
+        "$.input[72].phase",
+        "$.input[72].call_id",
+        "$.input[72].name",
+        "$.input[72].arguments",
+        "$.input[73].id",
+        "$.input[73].call_id",
+        "$.input[73].name",
+        "$.input[73].arguments",
+        "$.input[74].id",
+        "$.input[74].call_id",
+        "$.input[74].name",
+        "$.input[74].arguments",
+        "$.input[75].type",
+        "$.input[75].id",
+        "$.input[75].call_id",
+        "$.input[75].name",
+        "$.input[75].arguments",
+        "$.input[75].role",
+        "$.input[75].content",
+        "$.input[75].status",
+        "$.input[76].type",
+        "$.input[76].role",
+        "$.input[76].content",
+        "$.input[76].status",
+        "$.input[76].id",
+        "$.input[76].call_id",
+        "$.input[76].output",
+        "$.input[77].call_id",
+        "$.input[77].output",
+        "$.input[78].call_id",
+        "$.input[78].output",
+        "$.input[79].call_id",
+        "$.input[79].output",
+        "$.input[80].call_id",
+        "$.input[80].output",
+        "$.input[81].call_id",
+        "$.input[81].output",
+        "$.input[82].type",
+        "$.input[82].call_id",
+        "$.input[82].output",
+        "$.input[82].role",
+        "$.input[82].content",
+        "$.input[83].role",
+        "$.input[83].content",
+        "$.input[83].type",
+        "$.input[83].id",
+        "$.input[83].summary",
+        "$.input[83].encrypted_content",
+        "$.input[84].type",
+        "$.input[84].id",
+        "$.input[84].summary",
+        "$.input[84].encrypted_content",
+        "$.input[84].call_id",
+        "$.input[84].name",
+        "$.input[84].arguments",
+        "$.input[85].id",
+        "$.input[85].call_id",
+        "$.input[85].name",
+        "$.input[85].arguments",
+        "$.input[86].id",
+        "$.input[86].call_id",
+        "$.input[86].name",
+        "$.input[86].arguments",
+        "$.input[87].type",
+        "$.input[87].id",
+        "$.input[87].call_id",
+        "$.input[87].name",
+        "$.input[87].arguments",
+        "$.input[87].role",
+        "$.input[87].content",
+        "$.input[87].status",
+        "$.input[87].phase",
+        "$.input[88].type",
+        "$.input[88].role",
+        "$.input[88].content",
+        "$.input[88].status",
+        "$.input[88].id",
+        "$.input[88].phase",
+        "$.input[88].call_id",
+        "$.input[88].name",
+        "$.input[88].arguments",
+        "$.input[89].id",
+        "$.input[89].call_id",
+        "$.input[89].name",
+        "$.input[89].arguments",
+        "$.input[90].id",
+        "$.input[90].call_id",
+        "$.input[90].name",
+        "$.input[90].arguments",
+        "$.input[91].type",
+        "$.input[91].id",
+        "$.input[91].call_id",
+        "$.input[91].name",
+        "$.input[91].arguments",
+        "$.input[91].role",
+        "$.input[91].content",
+        "$.input[91].status",
+        "$.input[92].type",
+        "$.input[92].role",
+        "$.input[92].content",
+        "$.input[92].status",
+        "$.input[92].id",
+        "$.input[92].call_id",
+        "$.input[92].output",
+        "$.input[93].call_id",
+        "$.input[93].output",
+        "$.input[94].call_id",
+        "$.input[94].output",
+        "$.input[95].call_id",
+        "$.input[95].output",
+        "$.input[96].call_id",
+        "$.input[96].output",
+        "$.input[97].call_id",
+        "$.input[97].output",
+        "$.input[98].type",
+        "$.input[98].call_id",
+        "$.input[98].output",
+        "$.input[98].role",
+        "$.input[98].content",
+        "$.input[99].role",
+        "$.input[99].content",
+        "$.input[99].type",
+        "$.input[99].id",
+        "$.input[99].summary",
+        "$.input[99].encrypted_content",
+        "$.input[100].type",
+        "$.input[100].id",
+        "$.input[100].summary",
+        "$.input[100].encrypted_content",
+        "$.input[100].call_id",
+        "$.input[100].name",
+        "$.input[100].arguments",
+        "$.input[101].id",
+        "$.input[101].call_id",
+        "$.input[101].name",
+        "$.input[101].arguments",
+        "$.input[102].id",
+        "$.input[102].call_id",
+        "$.input[102].name",
+        "$.input[102].arguments",
+        "$.input[103].type",
+        "$.input[103].id",
+        "$.input[103].call_id",
+        "$.input[103].name",
+        "$.input[103].arguments",
+        "$.input[103].role",
+        "$.input[103].content",
+        "$.input[103].status",
+        "$.input[103].phase",
+        "$.input[104].type",
+        "$.input[104].role",
+        "$.input[104].content",
+        "$.input[104].status",
+        "$.input[104].id",
+        "$.input[104].phase",
+        "$.input[104].call_id",
+        "$.input[104].name",
+        "$.input[104].arguments",
+        "$.input[105].id",
+        "$.input[105].call_id",
+        "$.input[105].name",
+        "$.input[105].arguments",
+        "$.input[106].id",
+        "$.input[106].call_id",
+        "$.input[106].name",
+        "$.input[106].arguments",
+        "$.input[107].type",
+        "$.input[107].id",
+        "$.input[107].call_id",
+        "$.input[107].name",
+        "$.input[107].arguments",
+        "$.input[107].role",
+        "$.input[107].content",
+        "$.input[107].status",
+        "$.input[108].type",
+        "$.input[108].role",
+        "$.input[108].content",
+        "$.input[108].status",
+        "$.input[108].id",
+        "$.input[108].call_id",
+        "$.input[108].output",
+        "$.input[109].call_id",
+        "$.input[109].output",
+        "$.input[110].call_id",
+        "$.input[110].output",
+        "$.input[111].call_id",
+        "$.input[111].output",
+        "$.input[112].call_id",
+        "$.input[112].output",
+        "$.input[113].call_id",
+        "$.input[113].output",
+        "$.input[114].type",
+        "$.input[114].call_id",
+        "$.input[114].output",
+        "$.input[114].role",
+        "$.input[114].content",
+        "$.input[115].role",
+        "$.input[115].content",
+        "$.input[115].type",
+        "$.input[115].id",
+        "$.input[115].summary",
+        "$.input[115].encrypted_content",
+        "$.input[116].type",
+        "$.input[116].id",
+        "$.input[116].summary",
+        "$.input[116].encrypted_content",
+        "$.input[116].call_id",
+        "$.input[116].name",
+        "$.input[116].arguments",
+        "$.input[117].id",
+        "$.input[117].call_id",
+        "$.input[117].name",
+        "$.input[117].arguments",
+        "$.input[118].id",
+        "$.input[118].call_id",
+        "$.input[118].name",
+        "$.input[118].arguments",
+        "$.input[119].type",
+        "$.input[119].id",
+        "$.input[119].call_id",
+        "$.input[119].name",
+        "$.input[119].arguments",
+        "$.input[119].role",
+        "$.input[119].content",
+        "$.input[119].status",
+        "$.input[119].phase",
+        "$.input[120].type",
+        "$.input[120].role",
+        "$.input[120].content",
+        "$.input[120].status",
+        "$.input[120].id",
+        "$.input[120].phase",
+        "$.input[120].call_id",
+        "$.input[120].name",
+        "$.input[120].arguments",
+        "$.input[121].id",
+        "$.input[121].call_id",
+        "$.input[121].name",
+        "$.input[121].arguments",
+        "$.input[122].id",
+        "$.input[122].call_id",
+        "$.input[122].name",
+        "$.input[122].arguments",
+        "$.input[123].type",
+        "$.input[123].id",
+        "$.input[123].call_id",
+        "$.input[123].name",
+        "$.input[123].arguments",
+        "$.input[123].role",
+        "$.input[123].content",
+        "$.input[123].status",
+        "$.input[124].type",
+        "$.input[124].role",
+        "$.input[124].content",
+        "$.input[124].status",
+        "$.input[124].id",
+        "$.input[124].call_id",
+        "$.input[124].output",
+        "$.input[125].call_id",
+        "$.input[125].output",
+        "$.input[126].call_id",
+        "$.input[126].output",
+        "$.input[127].call_id",
+        "$.input[127].output",
+        "$.input[128].call_id",
+        "$.input[128].output",
+        "$.input[129].call_id",
+        "$.input[129].output",
+        "$.input[130].type",
+        "$.input[130].call_id",
+        "$.input[130].output",
+        "$.input[130].role",
+        "$.input[130].content",
+        "$.input[131]",
+        "$.prompt_cache_retention"
+      ]
+    },
+    "gpt6sol-sse-roundtrip": {
+      "summary": {
+        "keys": [
+          "model",
+          "input",
+          "stream",
+          "prompt_cache_key",
+          "store",
+          "max_output_tokens",
+          "tools",
+          "reasoning",
+          "include"
+        ],
+        "bytes": 30194,
+        "inputCounts": {
+          "developer": 1,
+          "user": 11,
+          "reasoning": 9,
+          "function_call": 49,
+          "message": 17,
+          "function_call_output": 49
+        },
+        "firstItem": {
+          "role": "developer",
+          "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+        },
+        "reasoning": {
+          "effort": "high",
+          "summary": "auto"
+        },
+        "include": [
+          "reasoning.encrypted_content"
+        ],
+        "cacheRetention": "<absent>",
+        "strict": [
+          "<absent>",
+          "<absent>"
+        ]
+      },
+      "diffsFromPrimary": [
+        "$.input[132]",
+        "$.input[133]",
+        "$.input[134]",
+        "$.input[135]",
+        "$.prompt_cache_retention"
+      ]
+    }
+  },
+  "gptVsDeepseekSyntheticConfigDiffs": [
+    {
+      "path": "$.model",
+      "dsh": "gpt6sol",
+      "native": "deepseekflash"
+    }
+  ],
+  "originalArguments": {
+    "original": "{\n  \"index\" : 0,\n  \"label\" : \"synthetic-0-0\"\n}",
+    "outbound": "{\"index\":0,\"label\":\"synthetic-0-0\"}"
+  },
+  "sseRoundtrip": {
+    "replayState": {
+      "response": {
+        "kind": "pi-ai",
+        "version": 2,
+        "api": "openai-responses",
+        "provider": "openai-responses",
+        "model": "gpt6sol",
+        "responseId": "resp_synthetic_fixture",
+        "stopReason": "toolUse"
+      },
+      "blocks": [
+        {
+          "type": "reasoning",
+          "thinkingSignature": "{\"type\":\"reasoning\",\"id\":\"rs_sse_fixture\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Synthetic reasoning summary; not a real model output.\"}],\"encrypted_content\":\"SYNTHETIC_OPAQUE_REASONING_NOT_VALID_ON_ANY_SERVER\"}"
+        },
+        {
+          "type": "text",
+          "textSignature": "{\"v\":1,\"id\":\"msg_sse_fixture\",\"phase\":\"commentary\"}"
+        },
+        {
+          "type": "tool-call"
+        }
+      ]
+    },
+    "emittedBlocks": [
+      {
+        "type": "reasoning",
+        "text": "Synthetic reasoning summary; not a real model output."
+      },
+      {
+        "type": "text",
+        "text": "Synthetic replay check."
+      },
+      {
+        "type": "tool-call",
+        "id": "call_sse_fixture|fc_sse_fixture",
+        "name": "lab_lookup",
+        "arguments": "{\"index\":99,\"label\":\"sse fixture\"}"
+      }
+    ],
+    "replayedTail": [
+      {
+        "type": "reasoning",
+        "id": "rs_sse_fixture",
+        "summary": [
+          {
+            "type": "summary_text",
+            "text": "Synthetic reasoning summary; not a real model output."
+          }
+        ],
+        "encrypted_content": "SYNTHETIC_OPAQUE_REASONING_NOT_VALID_ON_ANY_SERVER"
+      },
+      {
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "Synthetic replay check.",
+            "annotations": []
+          }
+        ],
+        "status": "completed",
+        "id": "msg_sse_fixture",
+        "phase": "commentary"
+      },
+      {
+        "type": "function_call",
+        "id": "fc_sse_fixture",
+        "call_id": "call_sse_fixture",
+        "name": "lab_lookup",
+        "arguments": "{\"index\":99,\"label\":\"sse fixture\"}"
+      },
+      {
+        "type": "function_call_output",
+        "call_id": "call_sse_fixture",
+        "output": "Synthetic follow-up result."
+      }
+    ]
+  },
+  "nativeEdges": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "type": "function_call",
+      "id": "fc_orphan",
+      "call_id": "call_orphan",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_orphan",
+      "output": "No result provided"
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "orphan closure check"
+        }
+      ]
+    }
+  ],
+  "checks": [
+    "SDK native equivalent has zero structural field differences",
+    "direct pi-ai streamSimple body equals actual DSH body",
+    "primary has 48 function_calls and 48 separate function_call_outputs",
+    "default cache retention omits retention; long adds only 24h",
+    "none removes cache key; unsupported long omits retention",
+    "strict omitted by default, false when compatibility support is enabled",
+    "reasoning enabled sends high + summary auto + encrypted include; omitted/off sends none only",
+    "system goes in developer input, never top-level instructions, leading text concatenates",
+    "empty user string and empty assistant text block survive; empty assistant message skipped",
+    "interleaved assistant blocks flatten in original order; reverse tool-result order preserved",
+    "DSH empty tool text becomes (no output), whitespace-only becomes (no tool output), blocks concatenate",
+    "tool argument original whitespace is lost by parse/stringify",
+    "same-model signed reasoning and text id/phase replay; foreign replay drops reasoning/signatures",
+    "real synthetic SSE terminal backfills encrypted reasoning and persists/replays text phase/id",
+    "native empty user array skipped; unsigned thinking omitted; orphan output synthesized",
+    "streamSimple summary defaults auto; full stream accepts detailed",
+    "sanitized nosafe default calls capture cap128000, developer input, no retention and marker equality",
+    "original-argument native contrast differs in exactly 48 arguments strings, with JSON values equal",
+    "no socket/http/DNS network attempts occurred"
+  ],
+  "mockFetchCalls": 21,
+  "networkAttempts": [],
+  "caveats": [
+    "Model ids are synthetic gpt6sol/deepseekflash, not assertions about a private deployed profile, real endpoint, or provider model capability. Provider route is literally openai-responses; api is openai-responses.",
+    "Original argument JSON formatting cannot survive DSH parseArguments + Responses JSON.stringify. Retaining original native argument strings would be a separate, intentionally non-equivalent fixture.",
+    "Opaque signatures here are synthetic sentinels, not valid model reasoning state. Actual future encrypted_content/ids/state are unknown and cannot be predicted or matched across independent real LLM rounds.",
+    "SSE roundtrip uses actual DSH replayState production/reconstruction, but not the separate agent BlockAssembler/session persistence layer; no claim of live session fidelity.",
+    "No real LLM, paid request, cache hit, pricing, server acceptance, or latency measured. Zero usage in SSE is a test fixture, not a measurement."
+  ]
+}

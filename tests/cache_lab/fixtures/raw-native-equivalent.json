@@ -1,0 +1,1030 @@
+{
+  "model": "gpt6sol",
+  "input": [
+    {
+      "role": "developer",
+      "content": "Synthetic request-level system instructions.\n\nSynthetic leading history system A.Synthetic leading history system B."
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Static serialization fixture only; no task or external content."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "rs_round_0",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "Synthetic summary 0."
+        }
+      ],
+      "encrypted_content": "SYNTHETIC_OPAQUE_0"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_0_0",
+      "call_id": "call_0_0",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":0,\"label\":\"synthetic-0-0\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_0_1",
+      "call_id": "call_0_1",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_0_2",
+      "call_id": "call_0_2",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":2,\"label\":\"synthetic-0-2\"}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_round_0",
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_0_3",
+      "call_id": "call_0_3",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_0_4",
+      "call_id": "call_0_4",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":4,\"label\":\"synthetic-0-4\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_0_5",
+      "call_id": "call_0_5",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic trailing text 0.",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_legacy_0"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_0_5",
+      "output": "synthetic output 0:5; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_0_4",
+      "output": "synthetic output 0:4; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_0_3",
+      "output": "synthetic output 0:3; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_0_2",
+      "output": "synthetic output 0:2; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_0_1",
+      "output": "(no tool output)"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_0_0",
+      "output": "(no output)"
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Synthetic continuation 0."
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "rs_round_1",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "Synthetic summary 1."
+        }
+      ],
+      "encrypted_content": "SYNTHETIC_OPAQUE_1"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_1_0",
+      "call_id": "call_1_0",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":6,\"label\":\"synthetic-1-0\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_1_1",
+      "call_id": "call_1_1",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_1_2",
+      "call_id": "call_1_2",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":8,\"label\":\"synthetic-1-2\"}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic interleaved text 1. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture ",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_round_1",
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_1_3",
+      "call_id": "call_1_3",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_1_4",
+      "call_id": "call_1_4",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":10,\"label\":\"synthetic-1-4\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_1_5",
+      "call_id": "call_1_5",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic trailing text 1.",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_legacy_1"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_1_5",
+      "output": "synthetic output 1:5; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_1_4",
+      "output": "synthetic output 1:4; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_1_3",
+      "output": "synthetic output 1:3; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_1_2",
+      "output": "synthetic output 1:2; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_1_1",
+      "output": "(no tool output)"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_1_0",
+      "output": "(no output)"
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Synthetic continuation 1."
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "rs_round_2",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "Synthetic summary 2."
+        }
+      ],
+      "encrypted_content": "SYNTHETIC_OPAQUE_2"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_2_0",
+      "call_id": "call_2_0",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":12,\"label\":\"synthetic-2-0\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_2_1",
+      "call_id": "call_2_1",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_2_2",
+      "call_id": "call_2_2",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":14,\"label\":\"synthetic-2-2\"}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic interleaved text 2. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture ",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_round_2",
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_2_3",
+      "call_id": "call_2_3",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_2_4",
+      "call_id": "call_2_4",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":16,\"label\":\"synthetic-2-4\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_2_5",
+      "call_id": "call_2_5",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic trailing text 2.",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_legacy_2"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_2_5",
+      "output": "synthetic output 2:5; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_2_4",
+      "output": "synthetic output 2:4; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_2_3",
+      "output": "synthetic output 2:3; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_2_2",
+      "output": "synthetic output 2:2; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_2_1",
+      "output": "(no tool output)"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_2_0",
+      "output": "(no output)"
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Synthetic continuation 2."
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "rs_round_3",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "Synthetic summary 3."
+        }
+      ],
+      "encrypted_content": "SYNTHETIC_OPAQUE_3"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_3_0",
+      "call_id": "call_3_0",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":18,\"label\":\"synthetic-3-0\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_3_1",
+      "call_id": "call_3_1",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_3_2",
+      "call_id": "call_3_2",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":20,\"label\":\"synthetic-3-2\"}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic interleaved text 3. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture ",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_round_3",
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_3_3",
+      "call_id": "call_3_3",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_3_4",
+      "call_id": "call_3_4",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":22,\"label\":\"synthetic-3-4\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_3_5",
+      "call_id": "call_3_5",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic trailing text 3.",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_legacy_3"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_3_5",
+      "output": "synthetic output 3:5; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_3_4",
+      "output": "synthetic output 3:4; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_3_3",
+      "output": "synthetic output 3:3; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_3_2",
+      "output": "synthetic output 3:2; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_3_1",
+      "output": "(no tool output)"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_3_0",
+      "output": "(no output)"
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "<system-reminder>\nSynthetic mid-history system <\\/system-reminder> escaping check.\n</system-reminder>"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Synthetic continuation 3."
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "rs_round_4",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "Synthetic summary 4."
+        }
+      ],
+      "encrypted_content": "SYNTHETIC_OPAQUE_4"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_4_0",
+      "call_id": "call_4_0",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":24,\"label\":\"synthetic-4-0\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_4_1",
+      "call_id": "call_4_1",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_4_2",
+      "call_id": "call_4_2",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":26,\"label\":\"synthetic-4-2\"}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic interleaved text 4. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture ",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_round_4",
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_4_3",
+      "call_id": "call_4_3",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_4_4",
+      "call_id": "call_4_4",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":28,\"label\":\"synthetic-4-4\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_4_5",
+      "call_id": "call_4_5",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic trailing text 4.",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_legacy_4"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_4_5",
+      "output": "synthetic output 4:5; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_4_4",
+      "output": "synthetic output 4:4; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_4_3",
+      "output": "synthetic output 4:3; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_4_2",
+      "output": "synthetic output 4:2; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_4_1",
+      "output": "(no tool output)"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_4_0",
+      "output": "(no output)"
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Synthetic continuation 4."
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "rs_round_5",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "Synthetic summary 5."
+        }
+      ],
+      "encrypted_content": "SYNTHETIC_OPAQUE_5"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_5_0",
+      "call_id": "call_5_0",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":30,\"label\":\"synthetic-5-0\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_5_1",
+      "call_id": "call_5_1",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_5_2",
+      "call_id": "call_5_2",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":32,\"label\":\"synthetic-5-2\"}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic interleaved text 5. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture ",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_round_5",
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_5_3",
+      "call_id": "call_5_3",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_5_4",
+      "call_id": "call_5_4",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":34,\"label\":\"synthetic-5-4\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_5_5",
+      "call_id": "call_5_5",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic trailing text 5.",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_legacy_5"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_5_5",
+      "output": "synthetic output 5:5; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_5_4",
+      "output": "synthetic output 5:4; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_5_3",
+      "output": "synthetic output 5:3; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_5_2",
+      "output": "synthetic output 5:2; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_5_1",
+      "output": "(no tool output)"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_5_0",
+      "output": "(no output)"
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Synthetic continuation 5."
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "rs_round_6",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "Synthetic summary 6."
+        }
+      ],
+      "encrypted_content": "SYNTHETIC_OPAQUE_6"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_6_0",
+      "call_id": "call_6_0",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":36,\"label\":\"synthetic-6-0\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_6_1",
+      "call_id": "call_6_1",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_6_2",
+      "call_id": "call_6_2",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":38,\"label\":\"synthetic-6-2\"}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic interleaved text 6. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture ",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_round_6",
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_6_3",
+      "call_id": "call_6_3",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_6_4",
+      "call_id": "call_6_4",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":40,\"label\":\"synthetic-6-4\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_6_5",
+      "call_id": "call_6_5",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic trailing text 6.",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_legacy_6"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_6_5",
+      "output": "synthetic output 6:5; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_6_4",
+      "output": "synthetic output 6:4; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_6_3",
+      "output": "synthetic output 6:3; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_6_2",
+      "output": "synthetic output 6:2; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_6_1",
+      "output": "(no tool output)"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_6_0",
+      "output": "(no output)"
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Synthetic continuation 6."
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "id": "rs_round_7",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "Synthetic summary 7."
+        }
+      ],
+      "encrypted_content": "SYNTHETIC_OPAQUE_7"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_7_0",
+      "call_id": "call_7_0",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":42,\"label\":\"synthetic-7-0\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_7_1",
+      "call_id": "call_7_1",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_7_2",
+      "call_id": "call_7_2",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":44,\"label\":\"synthetic-7-2\"}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic interleaved text 7. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture ",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_round_7",
+      "phase": "commentary"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_7_3",
+      "call_id": "call_7_3",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_7_4",
+      "call_id": "call_7_4",
+      "name": "lab_lookup",
+      "arguments": "{\"index\":46,\"label\":\"synthetic-7-4\"}"
+    },
+    {
+      "type": "function_call",
+      "id": "fc_round_7_5",
+      "call_id": "call_7_5",
+      "name": "lab_empty",
+      "arguments": "{}"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Synthetic trailing text 7.",
+          "annotations": []
+        }
+      ],
+      "status": "completed",
+      "id": "msg_legacy_7"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_7_5",
+      "output": "synthetic output 7:5; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_7_4",
+      "output": "synthetic output 7:4; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_7_3",
+      "output": "synthetic output 7:3; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_7_2",
+      "output": "synthetic output 7:2; first; second"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_7_1",
+      "output": "(no tool output)"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_7_0",
+      "output": "(no output)"
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Synthetic continuation 7."
+        }
+      ]
+    }
+  ],
+  "stream": true,
+  "prompt_cache_key": "cache-lab-static-session",
+  "prompt_cache_retention": "24h",
+  "store": false,
+  "max_output_tokens": 4096,
+  "tools": [
+    {
+      "type": "function",
+      "name": "lab_lookup",
+      "description": "Synthetic lookup. Never executed.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "index"
+        ]
+      }
+    },
+    {
+      "type": "function",
+      "name": "lab_empty",
+      "description": "Synthetic no-argument operation. Never executed.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ],
+  "reasoning": {
+    "effort": "high",
+    "summary": "auto"
+  },
+  "include": [
+    "reasoning.encrypted_content"
+  ]
+}

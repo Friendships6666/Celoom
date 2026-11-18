@@ -1,0 +1,85 @@
+{
+  "dsh": {
+    "accept": "application/json",
+    "authorization": "<present; value never saved>",
+    "content-type": "application/json",
+    "session_id": "<present; not on static-value allowlist>",
+    "user-agent": "deepseek-harness/0.2.2-rc.1 (+https://github.com/deepseek-ai/deepseek-harness)",
+    "x-client-request-id": "<present; not on static-value allowlist>",
+    "x-stainless-arch": "x64",
+    "x-stainless-lang": "js",
+    "x-stainless-os": "Linux",
+    "x-stainless-package-version": "7.19.0",
+    "x-stainless-retry-count": "0",
+    "x-stainless-runtime": "node",
+    "x-stainless-runtime-version": "v26.11.1"
+  },
+  "nativeSDK": {
+    "accept": "application/json",
+    "authorization": "<present; value never saved>",
+    "content-type": "application/json",
+    "user-agent": "OpenAI/JS 7.19.0",
+    "x-stainless-arch": "x64",
+    "x-stainless-lang": "js",
+    "x-stainless-os": "Linux",
+    "x-stainless-package-version": "7.19.0",
+    "x-stainless-retry-count": "0",
+    "x-stainless-runtime": "node",
+    "x-stainless-runtime-version": "v26.11.1"
+  },
+  "directPiWithDshOptions": {
+    "accept": "application/json",
+    "authorization": "<present; value never saved>",
+    "content-type": "application/json",
+    "session_id": "<present; not on static-value allowlist>",
+    "user-agent": "deepseek-harness/0.2.2-rc.1 (+https://github.com/deepseek-ai/deepseek-harness)",
+    "x-client-request-id": "<present; not on static-value allowlist>",
+    "x-stainless-arch": "x64",
+    "x-stainless-lang": "js",
+    "x-stainless-os": "Linux",
+    "x-stainless-package-version": "7.19.0",
+    "x-stainless-retry-count": "0",
+    "x-stainless-runtime": "node",
+    "x-stainless-runtime-version": "v26.11.1"
+  },
+  "nosafeDefault": {
+    "accept": "application/json",
+    "authorization": "<present; value never saved>",
+    "content-type": "application/json",
+    "session_id": "<present; not on static-value allowlist>",
+    "user-agent": "deepseek-harness/0.2.2-rc.1 (+https://github.com/deepseek-ai/deepseek-harness)",
+    "x-client-request-id": "<present; not on static-value allowlist>",
+    "x-stainless-arch": "x64",
+    "x-stainless-lang": "js",
+    "x-stainless-os": "Linux",
+    "x-stainless-package-version": "7.19.0",
+    "x-stainless-retry-count": "0",
+    "x-stainless-runtime": "node",
+    "x-stainless-runtime-version": "v26.11.1"
+  },
+  "markedAgentLoopRequestSameHeaders": true,
+  "externalHeaderWaterfallNotRun": "PiAiAdapter.prepareHeaders omitted: no live ctx/plugin hooks executed. markAgentLoopRequest only adds WeakSet identity and did not change body/default headers in this adapter. Real deployment plugins may still contribute headers.",
+  "differences": [
+    {
+      "path": "$.session_id",
+      "dsh": "<present; not on static-value allowlist>",
+      "native": "<absent>"
+    },
+    {
+      "path": "$.user-agent",
+      "dsh": "deepseek-harness/0.2.2-rc.1 (+https://github.com/deepseek-ai/deepseek-harness)",
+      "native": "OpenAI/JS 7.19.0"
+    },
+    {
+      "path": "$.x-client-request-id",
+      "dsh": "<present; not on static-value allowlist>",
+      "native": "<absent>"
+    }
+  ],
+  "interpretation": "Same body does not imply equal HTTP headers. DSH user-agent wins over pi identity; native SDK-only default user-agent/x-stainless are captured, not guessed. originator and provider attribution are absent unless shown. Auth values are never persisted. Session header values are redacted even though synthetic.",
+  "paidABProposalOnly": [
+    "Hold exact body, credential, endpoint, session/cache keys, tool schemas and reasoning state fixed; alternate only captured static user-agent.",
+    "Hold body fixed; compare SDK x-stainless header group present vs absent.",
+    "Only if measured header exists, alternate originator/provider-attribution separately; do not invent a claim it exists."
+  ]
+}

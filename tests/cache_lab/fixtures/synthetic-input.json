@@ -1,0 +1,1554 @@
+{
+  "modelConfigs": [
+    {
+      "id": "gpt6sol",
+      "name": "Synthetic gpt6sol",
+      "api": "openai-responses",
+      "provider": "openai-responses",
+      "baseUrl": "http://127.0.0.1:1/v1",
+      "reasoning": true,
+      "input": [
+        "text"
+      ],
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "contextWindow": 262144,
+      "maxTokens": 4096
+    },
+    {
+      "id": "deepseekflash",
+      "name": "Synthetic deepseekflash",
+      "api": "openai-responses",
+      "provider": "openai-responses",
+      "baseUrl": "http://127.0.0.1:1/v1",
+      "reasoning": true,
+      "input": [
+        "text"
+      ],
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "contextWindow": 262144,
+      "maxTokens": 4096
+    }
+  ],
+  "generateOptions": {
+    "provider": "openai-responses",
+    "model": "gpt6sol",
+    "system": "Synthetic request-level system instructions.",
+    "messages": [
+      {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic leading history system A."
+          },
+          {
+            "type": "text",
+            "text": "Synthetic leading history system B."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Static serialization fixture only; no task or external content."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": []
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "Visible synthetic reasoning 0; signature is authoritative for native replay."
+          },
+          {
+            "type": "tool-call",
+            "id": "call_0_0|fc_round_0_0",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 0,\n  \"label\" : \"synthetic-0-0\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_0_1|fc_round_0_1",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_0_2|fc_round_0_2",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 2,\n  \"label\" : \"synthetic-0-2\"\n}"
+          },
+          {
+            "type": "text",
+            "text": ""
+          },
+          {
+            "type": "tool-call",
+            "id": "call_0_3|fc_round_0_3",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_0_4|fc_round_0_4",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 4,\n  \"label\" : \"synthetic-0-4\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_0_5|fc_round_0_5",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic trailing text 0."
+          }
+        ],
+        "source": {
+          "provider": "openai-responses",
+          "model": "gpt6sol",
+          "replayState": {
+            "response": {
+              "kind": "pi-ai",
+              "version": 2,
+              "api": "openai-responses",
+              "provider": "openai-responses",
+              "model": "gpt6sol",
+              "stopReason": "toolUse"
+            },
+            "blocks": [
+              {
+                "type": "reasoning",
+                "thinkingSignature": "{\"type\":\"reasoning\",\"id\":\"rs_round_0\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Synthetic summary 0.\"}],\"encrypted_content\":\"SYNTHETIC_OPAQUE_0\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "{\"v\":1,\"id\":\"msg_round_0\",\"phase\":\"commentary\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "msg_legacy_0"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_0_5|fc_round_0_5",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 0:5; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_0_4|fc_round_0_4",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 0:4; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_0_3|fc_round_0_3",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 0:3; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_0_2|fc_round_0_2",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 0:2; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_0_1|fc_round_0_1",
+        "content": [
+          {
+            "type": "text",
+            "text": " \n\t "
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_0_0|fc_round_0_0",
+        "content": []
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic continuation 0."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "Visible synthetic reasoning 1; signature is authoritative for native replay."
+          },
+          {
+            "type": "tool-call",
+            "id": "call_1_0|fc_round_1_0",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 6,\n  \"label\" : \"synthetic-1-0\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_1_1|fc_round_1_1",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_1_2|fc_round_1_2",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 8,\n  \"label\" : \"synthetic-1-2\"\n}"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic interleaved text 1. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture "
+          },
+          {
+            "type": "tool-call",
+            "id": "call_1_3|fc_round_1_3",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_1_4|fc_round_1_4",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 10,\n  \"label\" : \"synthetic-1-4\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_1_5|fc_round_1_5",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic trailing text 1."
+          }
+        ],
+        "source": {
+          "provider": "openai-responses",
+          "model": "gpt6sol",
+          "replayState": {
+            "response": {
+              "kind": "pi-ai",
+              "version": 2,
+              "api": "openai-responses",
+              "provider": "openai-responses",
+              "model": "gpt6sol",
+              "stopReason": "toolUse"
+            },
+            "blocks": [
+              {
+                "type": "reasoning",
+                "thinkingSignature": "{\"type\":\"reasoning\",\"id\":\"rs_round_1\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Synthetic summary 1.\"}],\"encrypted_content\":\"SYNTHETIC_OPAQUE_1\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "{\"v\":1,\"id\":\"msg_round_1\",\"phase\":\"commentary\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "msg_legacy_1"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_1_5|fc_round_1_5",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 1:5; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_1_4|fc_round_1_4",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 1:4; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_1_3|fc_round_1_3",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 1:3; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_1_2|fc_round_1_2",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 1:2; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_1_1|fc_round_1_1",
+        "content": [
+          {
+            "type": "text",
+            "text": " \n\t "
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_1_0|fc_round_1_0",
+        "content": []
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic continuation 1."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "Visible synthetic reasoning 2; signature is authoritative for native replay."
+          },
+          {
+            "type": "tool-call",
+            "id": "call_2_0|fc_round_2_0",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 12,\n  \"label\" : \"synthetic-2-0\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_2_1|fc_round_2_1",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_2_2|fc_round_2_2",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 14,\n  \"label\" : \"synthetic-2-2\"\n}"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic interleaved text 2. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture "
+          },
+          {
+            "type": "tool-call",
+            "id": "call_2_3|fc_round_2_3",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_2_4|fc_round_2_4",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 16,\n  \"label\" : \"synthetic-2-4\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_2_5|fc_round_2_5",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic trailing text 2."
+          }
+        ],
+        "source": {
+          "provider": "openai-responses",
+          "model": "gpt6sol",
+          "replayState": {
+            "response": {
+              "kind": "pi-ai",
+              "version": 2,
+              "api": "openai-responses",
+              "provider": "openai-responses",
+              "model": "gpt6sol",
+              "stopReason": "toolUse"
+            },
+            "blocks": [
+              {
+                "type": "reasoning",
+                "thinkingSignature": "{\"type\":\"reasoning\",\"id\":\"rs_round_2\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Synthetic summary 2.\"}],\"encrypted_content\":\"SYNTHETIC_OPAQUE_2\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "{\"v\":1,\"id\":\"msg_round_2\",\"phase\":\"commentary\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "msg_legacy_2"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_2_5|fc_round_2_5",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 2:5; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_2_4|fc_round_2_4",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 2:4; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_2_3|fc_round_2_3",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 2:3; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_2_2|fc_round_2_2",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 2:2; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_2_1|fc_round_2_1",
+        "content": [
+          {
+            "type": "text",
+            "text": " \n\t "
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_2_0|fc_round_2_0",
+        "content": []
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic continuation 2."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "Visible synthetic reasoning 3; signature is authoritative for native replay."
+          },
+          {
+            "type": "tool-call",
+            "id": "call_3_0|fc_round_3_0",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 18,\n  \"label\" : \"synthetic-3-0\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_3_1|fc_round_3_1",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_3_2|fc_round_3_2",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 20,\n  \"label\" : \"synthetic-3-2\"\n}"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic interleaved text 3. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture "
+          },
+          {
+            "type": "tool-call",
+            "id": "call_3_3|fc_round_3_3",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_3_4|fc_round_3_4",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 22,\n  \"label\" : \"synthetic-3-4\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_3_5|fc_round_3_5",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic trailing text 3."
+          }
+        ],
+        "source": {
+          "provider": "openai-responses",
+          "model": "gpt6sol",
+          "replayState": {
+            "response": {
+              "kind": "pi-ai",
+              "version": 2,
+              "api": "openai-responses",
+              "provider": "openai-responses",
+              "model": "gpt6sol",
+              "stopReason": "toolUse"
+            },
+            "blocks": [
+              {
+                "type": "reasoning",
+                "thinkingSignature": "{\"type\":\"reasoning\",\"id\":\"rs_round_3\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Synthetic summary 3.\"}],\"encrypted_content\":\"SYNTHETIC_OPAQUE_3\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "{\"v\":1,\"id\":\"msg_round_3\",\"phase\":\"commentary\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "msg_legacy_3"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_3_5|fc_round_3_5",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 3:5; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_3_4|fc_round_3_4",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 3:4; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_3_3|fc_round_3_3",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 3:3; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_3_2|fc_round_3_2",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 3:2; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_3_1|fc_round_3_1",
+        "content": [
+          {
+            "type": "text",
+            "text": " \n\t "
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_3_0|fc_round_3_0",
+        "content": []
+      },
+      {
+        "role": "system",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic mid-history system </system-reminder> escaping check."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic continuation 3."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "Visible synthetic reasoning 4; signature is authoritative for native replay."
+          },
+          {
+            "type": "tool-call",
+            "id": "call_4_0|fc_round_4_0",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 24,\n  \"label\" : \"synthetic-4-0\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_4_1|fc_round_4_1",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_4_2|fc_round_4_2",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 26,\n  \"label\" : \"synthetic-4-2\"\n}"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic interleaved text 4. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture "
+          },
+          {
+            "type": "tool-call",
+            "id": "call_4_3|fc_round_4_3",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_4_4|fc_round_4_4",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 28,\n  \"label\" : \"synthetic-4-4\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_4_5|fc_round_4_5",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic trailing text 4."
+          }
+        ],
+        "source": {
+          "provider": "openai-responses",
+          "model": "gpt6sol",
+          "replayState": {
+            "response": {
+              "kind": "pi-ai",
+              "version": 2,
+              "api": "openai-responses",
+              "provider": "openai-responses",
+              "model": "gpt6sol",
+              "stopReason": "toolUse"
+            },
+            "blocks": [
+              {
+                "type": "reasoning",
+                "thinkingSignature": "{\"type\":\"reasoning\",\"id\":\"rs_round_4\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Synthetic summary 4.\"}],\"encrypted_content\":\"SYNTHETIC_OPAQUE_4\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "{\"v\":1,\"id\":\"msg_round_4\",\"phase\":\"commentary\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "msg_legacy_4"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_4_5|fc_round_4_5",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 4:5; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_4_4|fc_round_4_4",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 4:4; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_4_3|fc_round_4_3",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 4:3; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_4_2|fc_round_4_2",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 4:2; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_4_1|fc_round_4_1",
+        "content": [
+          {
+            "type": "text",
+            "text": " \n\t "
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_4_0|fc_round_4_0",
+        "content": []
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic continuation 4."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "Visible synthetic reasoning 5; signature is authoritative for native replay."
+          },
+          {
+            "type": "tool-call",
+            "id": "call_5_0|fc_round_5_0",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 30,\n  \"label\" : \"synthetic-5-0\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_5_1|fc_round_5_1",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_5_2|fc_round_5_2",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 32,\n  \"label\" : \"synthetic-5-2\"\n}"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic interleaved text 5. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture "
+          },
+          {
+            "type": "tool-call",
+            "id": "call_5_3|fc_round_5_3",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_5_4|fc_round_5_4",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 34,\n  \"label\" : \"synthetic-5-4\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_5_5|fc_round_5_5",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic trailing text 5."
+          }
+        ],
+        "source": {
+          "provider": "openai-responses",
+          "model": "gpt6sol",
+          "replayState": {
+            "response": {
+              "kind": "pi-ai",
+              "version": 2,
+              "api": "openai-responses",
+              "provider": "openai-responses",
+              "model": "gpt6sol",
+              "stopReason": "toolUse"
+            },
+            "blocks": [
+              {
+                "type": "reasoning",
+                "thinkingSignature": "{\"type\":\"reasoning\",\"id\":\"rs_round_5\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Synthetic summary 5.\"}],\"encrypted_content\":\"SYNTHETIC_OPAQUE_5\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "{\"v\":1,\"id\":\"msg_round_5\",\"phase\":\"commentary\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "msg_legacy_5"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_5_5|fc_round_5_5",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 5:5; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_5_4|fc_round_5_4",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 5:4; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_5_3|fc_round_5_3",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 5:3; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_5_2|fc_round_5_2",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 5:2; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_5_1|fc_round_5_1",
+        "content": [
+          {
+            "type": "text",
+            "text": " \n\t "
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_5_0|fc_round_5_0",
+        "content": []
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic continuation 5."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "Visible synthetic reasoning 6; signature is authoritative for native replay."
+          },
+          {
+            "type": "tool-call",
+            "id": "call_6_0|fc_round_6_0",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 36,\n  \"label\" : \"synthetic-6-0\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_6_1|fc_round_6_1",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_6_2|fc_round_6_2",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 38,\n  \"label\" : \"synthetic-6-2\"\n}"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic interleaved text 6. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture "
+          },
+          {
+            "type": "tool-call",
+            "id": "call_6_3|fc_round_6_3",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_6_4|fc_round_6_4",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 40,\n  \"label\" : \"synthetic-6-4\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_6_5|fc_round_6_5",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic trailing text 6."
+          }
+        ],
+        "source": {
+          "provider": "openai-responses",
+          "model": "gpt6sol",
+          "replayState": {
+            "response": {
+              "kind": "pi-ai",
+              "version": 2,
+              "api": "openai-responses",
+              "provider": "openai-responses",
+              "model": "gpt6sol",
+              "stopReason": "toolUse"
+            },
+            "blocks": [
+              {
+                "type": "reasoning",
+                "thinkingSignature": "{\"type\":\"reasoning\",\"id\":\"rs_round_6\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Synthetic summary 6.\"}],\"encrypted_content\":\"SYNTHETIC_OPAQUE_6\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "{\"v\":1,\"id\":\"msg_round_6\",\"phase\":\"commentary\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "msg_legacy_6"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_6_5|fc_round_6_5",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 6:5; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_6_4|fc_round_6_4",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 6:4; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_6_3|fc_round_6_3",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 6:3; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_6_2|fc_round_6_2",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 6:2; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_6_1|fc_round_6_1",
+        "content": [
+          {
+            "type": "text",
+            "text": " \n\t "
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_6_0|fc_round_6_0",
+        "content": []
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic continuation 6."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "reasoning",
+            "text": "Visible synthetic reasoning 7; signature is authoritative for native replay."
+          },
+          {
+            "type": "tool-call",
+            "id": "call_7_0|fc_round_7_0",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 42,\n  \"label\" : \"synthetic-7-0\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_7_1|fc_round_7_1",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_7_2|fc_round_7_2",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 44,\n  \"label\" : \"synthetic-7-2\"\n}"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic interleaved text 7. fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture fixed-token-fixture "
+          },
+          {
+            "type": "tool-call",
+            "id": "call_7_3|fc_round_7_3",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_7_4|fc_round_7_4",
+            "name": "lab_lookup",
+            "arguments": "{\n  \"index\" : 46,\n  \"label\" : \"synthetic-7-4\"\n}"
+          },
+          {
+            "type": "tool-call",
+            "id": "call_7_5|fc_round_7_5",
+            "name": "lab_empty",
+            "arguments": "{ \n }"
+          },
+          {
+            "type": "text",
+            "text": "Synthetic trailing text 7."
+          }
+        ],
+        "source": {
+          "provider": "openai-responses",
+          "model": "gpt6sol",
+          "replayState": {
+            "response": {
+              "kind": "pi-ai",
+              "version": 2,
+              "api": "openai-responses",
+              "provider": "openai-responses",
+              "model": "gpt6sol",
+              "stopReason": "toolUse"
+            },
+            "blocks": [
+              {
+                "type": "reasoning",
+                "thinkingSignature": "{\"type\":\"reasoning\",\"id\":\"rs_round_7\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"Synthetic summary 7.\"}],\"encrypted_content\":\"SYNTHETIC_OPAQUE_7\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "{\"v\":1,\"id\":\"msg_round_7\",\"phase\":\"commentary\"}"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "tool-call"
+              },
+              {
+                "type": "text",
+                "textSignature": "msg_legacy_7"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_7_5|fc_round_7_5",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 7:5; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_7_4|fc_round_7_4",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 7:4; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_7_3|fc_round_7_3",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 7:3; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_7_2|fc_round_7_2",
+        "content": [
+          {
+            "type": "text",
+            "text": "synthetic output 7:2; first"
+          },
+          {
+            "type": "text",
+            "text": "; second"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_7_1|fc_round_7_1",
+        "content": [
+          {
+            "type": "text",
+            "text": " \n\t "
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "toolCallId": "call_7_0|fc_round_7_0",
+        "content": []
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic continuation 7."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [],
+        "source": {
+          "provider": "openai-responses",
+          "model": "gpt6sol"
+        }
+      }
+    ],
+    "tools": [
+      {
+        "name": "lab_lookup",
+        "description": "Synthetic lookup. Never executed.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "index": {
+              "type": "integer"
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "index"
+          ]
+        }
+      },
+      {
+        "name": "lab_empty",
+        "description": "Synthetic no-argument operation. Never executed.",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    ],
+    "sessionId": "cache-lab-static-session",
+    "reasoningEffort": "high"
+  }
+}

@@ -1,0 +1,56 @@
+[
+  {
+    "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-llm-pi-ai/lib/index.js",
+    "lines": "28-33,61-92,184-253,586-608,694-711,1157-1158,1204-1219,1271-1388,1778-1790,1993-2032",
+    "purpose": "DSH raw arguments, durable replay, context and streamSimple call",
+    "sha256": "1a3ae58f9b4493e15459cc5000ec80f21b5d3f4a9dea6ffb6bc28e5b8817ae8a"
+  },
+  {
+    "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/models.js",
+    "lines": "427-474",
+    "purpose": "Actual Models auth/header/context dispatch",
+    "sha256": "b2730ffa727d4a19a212172d031344fd6e0992082df233952233a15116824ac4"
+  },
+  {
+    "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/api/openai-responses.js",
+    "lines": "53-102,133-159,194-205,207-309",
+    "purpose": "Cache, compatibility, fetch, request params, reasoning",
+    "sha256": "904b218cb90ab1d2a3ba98ef1f2791660484e8444d358601d33156949b121b2b"
+  },
+  {
+    "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/api/openai-responses-shared.js",
+    "lines": "12-57,91-118,169-332,337-369,466-484,626-646",
+    "purpose": "Actual converter ordering/empty content/signature/strict semantics",
+    "sha256": "00796997da00cd4cb77ae8c1c4bb92a3d4a4a4dd5bea18524de7173e4f877e4c"
+  },
+  {
+    "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/api/transform-messages.js",
+    "lines": "85-127,138-211",
+    "purpose": "Same-model reasoning/text fidelity and missing tool outputs",
+    "sha256": "5654d81fdacdf3f3e9ca9eb89c4dfa71b742b852163ecd49ba38307f876db63e"
+  },
+  {
+    "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/api/simple-options.js",
+    "lines": "18-42",
+    "purpose": "Simple options forwarding and default token cap",
+    "sha256": "ff234becff46a6c25c1e437c86d72fbe7aeb4e107266d1bf6951622d223b0ae0"
+  },
+  {
+    "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@earendil-works/pi-ai/dist/utils/identity.js",
+    "lines": "37-45,65-99",
+    "purpose": "Pi user agent and provider attribution",
+    "sha256": "32b45824054a8a6125a7f3caedd9ff1c594f1a109fd2af4fa1b5729f4578ab62"
+  },
+  {
+    "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-llm/lib/index.js",
+    "lines": "372-387,841-878",
+    "purpose": "DSH loop-request WeakSet marker and user-agent attribution",
+    "sha256": "8e541fc98a11897706a122fde1db42f8b2a41b3b354ba3fcb932e9a16929ac6a"
+  },
+  {
+    "path": "/usr/lib/node_modules/@deepseek-ai/dsh/node_modules/openai/internal/request-options.js",
+    "lines": "25-51",
+    "purpose": "Actual SDK JSON stringify",
+    "sha256": "4c404d9fca06f76cb44471900336ca60e2950d461c1998a6010c9279bb078a65"
+  }
+]

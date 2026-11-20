@@ -1,6 +1,6 @@
 [package]
 name = "justaiagent"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.88"
 description = "A closed, Linux-native local AI agent with a remote-capable web interface"
@@ -8,6 +8,7 @@ license = "MIT"
 
 [dependencies]
 anyhow = "1"
+aws-lc-rs = { version = "1", default-features = false, features = ["aws-lc-sys"] }
 argon2 = "0.5"
 axum = { version = "0.8", features = ["macros", "multipart"] }
 base64 = "0.22"

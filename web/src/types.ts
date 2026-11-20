@@ -33,6 +33,7 @@ export type SessionStatus = 'idle' | 'running' | 'compacting' | 'auto_compacting
 export interface Session {
   id: string; title: string; cwd: string; selection: Selection; reasoning_effort: string | null; status: SessionStatus;
   created_at: string; updated_at: string; parent_id?: string | null; depth: number; context_epoch: number;
+  encryption?: 'none' | 'half' | 'full'; locked?: boolean;
 }
 export interface SessionSettings { selection: Selection; reasoning_effort: string | null }
 export interface AssistantSource { attempt_id: string; site_name: string; model_name: string; model: string; reasoning_effort: string | null }

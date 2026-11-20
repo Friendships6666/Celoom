@@ -20,6 +20,7 @@ mod quality;
 mod quality_network;
 mod quality_store;
 mod quality_transport;
+mod session_crypto;
 mod store;
 mod subagent_models;
 mod tools;
@@ -289,7 +290,13 @@ fn app(state: AppState) -> Router {
             get(computer_capture),
         )
         .route("/api/sessions", get(list_sessions).post(create_session))
-        .route("/api/sessions/{id}", get(session_detail))
+        .route("/api/sessions/{id}", get(session_detail).delete(delete_session_route))
+        .route(
+            "/api/sessions/{id}/encryption",
+            post(set_session_encryption_route),
+        )
+        .route("/api/sessions/{id}/unlock", post(unlock_session_route))
+        .route("/api/sessions/{id}/lock", post(lock_session_route))
         .route(
             "/api/sessions/{id}/settings",
             patch(update_session_settings),
@@ -848,8 +855,56 @@ async fn session_detail(
     Path(id): Path<String>,
 ) -> ApiResult<Json<Value>> {
     let session = state.store.session(&id).await?;
-    let events = state.store.events(&id, 0).await?;
+    let events = if session.locked {
+        Vec::new()
+    } else {
+        state.store.events(&id, 0).await?
+    };
     Ok(Json(json!({"session":session,"events":events})))
+}
+async fn delete_session_route(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    state.store.delete_session(&id).await?;
+    Ok(Json(json!({"deleted":true})))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SessionEncryptionInput {
+    mode: String,
+    #[serde(default)]
+    password: Option<String>,
+}
+async fn set_session_encryption_route(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<SessionEncryptionInput>,
+) -> ApiResult<Json<Session>> {
+    Ok(Json(
+        state
+            .store
+            .set_session_encryption(&id, &body.mode, body.password)
+            .await?,
+    ))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SessionUnlockInput {
+    password: String,
+}
+async fn unlock_session_route(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<SessionUnlockInput>,
+) -> ApiResult<Json<Session>> {
+    Ok(Json(state.store.unlock_session(&id, &body.password).await?))
+}
+async fn lock_session_route(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Session>> {
+    Ok(Json(state.store.lock_session(&id).await?))
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]

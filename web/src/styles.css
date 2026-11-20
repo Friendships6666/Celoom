@@ -476,6 +476,18 @@ summary::-webkit-details-marker { display: none; }
 .search-provider-card strong { font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .search-provider-card small { font-size: 9px; color: var(--muted); }
 .search-badge { font-size: 9px; font-weight: 500; padding: 1px 5px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+.session-enc-icon { display: inline-block; vertical-align: -1px; margin-left: 5px; color: var(--accent); opacity: .9; }
+.session-context-menu { position: fixed; z-index: 200; min-width: 176px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px; padding: 5px; box-shadow: 0 10px 28px rgba(0,0,0,.22); display: flex; flex-direction: column; gap: 2px; }
+.session-context-menu button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; color: var(--text); font-size: 11px; padding: 8px 10px; border-radius: 7px; cursor: pointer; text-align: left; }
+.session-context-menu button:hover:not(:disabled) { background: var(--surface-2); color: var(--accent); }
+.session-context-menu button.danger-item { color: var(--error); }
+.session-context-menu button.danger-item:hover:not(:disabled) { background: var(--error-bg); color: var(--error); }
+.session-context-menu .context-menu-sep { height: 1px; background: var(--line); margin: 3px 6px; }
+.session-lock-panel { flex: 1; display: grid; place-items: center; padding: 30px; }
+.session-lock-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 28px; box-shadow: 0 6px 24px rgba(0,0,0,.06); }
+.session-lock-card h3 { margin: 12px 0 6px; font-size: 16px; }
+.session-lock-card p { font-size: 11px; color: var(--muted); margin: 0 0 18px; line-height: 1.7; }
+.session-lock-card .button { width: 100%; margin-top: 8px; }
 .diagnostic-route { display: flex; flex-direction: column; gap: 5px; padding: 10px 0; margin: 0 0 12px; border-top: 1px solid currentColor; border-bottom: 1px solid currentColor; border-color: color-mix(in srgb, currentColor 18%, transparent); min-width: 0; }.diagnostic-route > span { font-size: 10px; font-weight: 550; }.diagnostic-route > code { display: block; font-size: 10px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
 .security-settings { max-width: 430px; margin: 0 auto; padding: 33px 25px; }.security-emblem { display: grid; place-items: center; width: 55px; height: 55px; border-radius: 15px; background: var(--accent-soft); color: var(--accent); margin-bottom: 20px; }.security-settings h3 { margin-bottom: 10px; }.password-form { margin-top: 25px; }.password-form > .button { width: 100%; margin-top: 5px; }.security-note { font-size: 9px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-top: 23px; }
 /* Responsive remote operation */

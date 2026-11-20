@@ -186,6 +186,10 @@ pub struct SubagentModel {
     pub reasoning_effort: Option<String>,
 }
 
+fn default_encryption() -> String {
+    "none".into()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Session {
     pub id: String,
@@ -201,6 +205,10 @@ pub struct Session {
     pub parent_id: Option<String>,
     pub depth: u32,
     pub context_epoch: u32,
+    #[serde(default = "default_encryption")]
+    pub encryption: String,
+    #[serde(default)]
+    pub locked: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

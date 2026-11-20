@@ -1,15 +1,71 @@
-use crate::models::*;
+use crate::{models::*, session_crypto};
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde_json::{Value, json};
-use std::{collections::HashSet, path::Path, sync::mpsc};
+use std::{
+    cell::RefCell,
+    collections::HashSet,
+    path::Path,
+    sync::{Arc, mpsc},
+};
 use tokio::sync::oneshot;
+
+thread_local! {
+    static WORKER_VAULT: RefCell<Option<Arc<session_crypto::KeyVault>>> = const { RefCell::new(None) };
+}
+
+fn with_vault<T>(f: impl FnOnce(&session_crypto::KeyVault) -> Result<T>) -> Result<T> {
+    WORKER_VAULT.with(|cell| {
+        let borrow = cell.borrow();
+        let vault = borrow
+            .as_deref()
+            .ok_or_else(|| anyhow!("Session key vault unavailable"))?;
+        f(vault)
+    })
+}
+
+fn session_key(db: &Connection, id: &str) -> Result<Option<[u8; 32]>> {
+    let enc: String = db
+        .query_row("SELECT encryption FROM sessions WHERE id=?1", [id], |r| {
+            r.get(0)
+        })
+        .optional()?
+        .ok_or_else(|| anyhow!("Session not found"))?;
+    match enc.as_str() {
+        "none" => Ok(None),
+        "half" => with_vault(|v| session_crypto::ensure_half_key(db, v, id).map(Some)),
+        "full" => with_vault(|v| {
+            v.get_full(id)
+                .map(Some)
+                .ok_or_else(|| anyhow!("SESSION_LOCKED: 会话已全加密，请输入密码解锁"))
+        }),
+        other => bail!("Unsupported session encryption mode: {other}"),
+    }
+}
+
+fn enc_str(db: &Connection, id: &str, text: &str) -> Result<String> {
+    match session_key(db, id)? {
+        Some(key) => session_crypto::encrypt_text(&key, id, text),
+        None => Ok(text.to_owned()),
+    }
+}
+
+fn dec_str(db: &Connection, id: &str, text: &str) -> Result<String> {
+    if !session_crypto::is_encrypted(text) {
+        return Ok(text.to_owned());
+    }
+    match session_key(db, id)? {
+        Some(key) => session_crypto::decrypt_text(&key, id, text),
+        None => bail!("SESSION_LOCKED: 会话数据已加密，无法直接读取"),
+    }
+}
 
 type Operation = Box<dyn FnOnce(&mut Connection, &mut SessionMirror) + Send + 'static>;
 #[derive(Clone)]
 pub struct Store {
     tx: mpsc::Sender<Operation>,
-    data_dir: std::sync::Arc<std::path::PathBuf>,
+    data_dir: Arc<std::path::PathBuf>,
+    vault: Arc<session_crypto::KeyVault>,
 }
 
 impl Store {
@@ -43,13 +99,27 @@ impl Store {
         if !columns.iter().any(|c| c == "reasoning_effort") {
             db.execute("ALTER TABLE sessions ADD COLUMN reasoning_effort TEXT", [])?;
         }
+        if !columns.iter().any(|c| c == "encryption") {
+            db.execute(
+                "ALTER TABLE sessions ADD COLUMN encryption TEXT NOT NULL DEFAULT 'none'",
+                [],
+            )?;
+        }
+        if !columns.iter().any(|c| c == "enc_meta") {
+            db.execute("ALTER TABLE sessions ADD COLUMN enc_meta TEXT", [])?;
+        }
         db.execute(
             "INSERT OR IGNORE INTO meta(key,value) VALUES('config',?1)",
             [serde_json::to_string(&AppConfig::default())?],
         )?;
+        session_crypto::migrate(&mut db)?;
         crate::autonomy_store::migrate(&mut db)?;
         crate::message_queue::migrate(&mut db)?;
         crate::quality_store::migrate(&mut db)?;
+        let vault = Arc::new(session_crypto::KeyVault::default());
+        WORKER_VAULT.with(|cell| {
+            *cell.borrow_mut() = Some(vault.clone());
+        });
         recover_interrupted(&mut db)?;
         let mut mirror = SessionMirror::open(
             &db,
@@ -58,17 +128,25 @@ impl Store {
                 .join("sessions"),
         )?;
         let (tx, rx) = mpsc::channel::<Operation>();
+        let worker_vault = vault.clone();
         std::thread::Builder::new()
             .name("justai-sqlite".into())
             .spawn(move || {
+                WORKER_VAULT.with(|cell| {
+                    *cell.borrow_mut() = Some(worker_vault);
+                });
                 for op in rx {
                     op(&mut db, &mut mirror);
                 }
             })?;
-        let data_dir = std::sync::Arc::new(std::fs::canonicalize(
+        let data_dir = Arc::new(std::fs::canonicalize(
             path.parent().unwrap_or_else(|| Path::new(".")),
         )?);
-        Ok(Self { tx, data_dir })
+        Ok(Self {
+            tx,
+            data_dir,
+            vault,
+        })
     }
     pub fn data_dir(&self) -> &Path {
         self.data_dir.as_path()
@@ -235,7 +313,7 @@ impl Store {
         depth: u32,
     ) -> Result<Session> {
         self.call(move |db| {
-            let s = Session { id:new_id(),title,cwd,selection,reasoning_effort:None,status:"idle".into(),created_at:now(),updated_at:now(),parent_id,depth,context_epoch:0 };
+            let s = Session { id:new_id(),title,cwd,selection,reasoning_effort:None,status:"idle".into(),created_at:now(),updated_at:now(),parent_id,depth,context_epoch:0,encryption:"none".into(),locked:false };
             db.execute("INSERT INTO sessions(id,title,cwd,selection,status,created_at,updated_at,parent_id,depth,context_epoch) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)", params![s.id,s.title,s.cwd,serde_json::to_string(&s.selection)?,s.status,s.created_at,s.updated_at,s.parent_id,s.depth,s.context_epoch])?;
             Ok(s)
         }).await
@@ -243,6 +321,253 @@ impl Store {
     pub async fn session(&self, id: &str) -> Result<Session> {
         let id = id.to_owned();
         self.call(move |db| load_session(db, &id)).await
+    }
+    pub async fn unlock_session(&self, id: &str, password: &str) -> Result<Session> {
+        let id = id.to_owned();
+        let password = password.to_owned();
+        self.call(move |db| {
+            let (enc, meta): (String, Option<String>) = db
+                .query_row(
+                    "SELECT encryption, enc_meta FROM sessions WHERE id=?1",
+                    [&id],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()?
+                .ok_or_else(|| anyhow!("Session not found"))?;
+            ensure!(enc == "full", "Session is not full-encrypted");
+            let meta = meta.ok_or_else(|| anyhow!("Missing session encryption metadata"))?;
+            let key = session_crypto::verify_full_password(&meta, &id, &password)?;
+            with_vault(|v| {
+                v.set_full(&id, key);
+                Ok(())
+            })?;
+            load_session(db, &id)
+        })
+        .await
+    }
+    pub async fn lock_session(&self, id: &str) -> Result<Session> {
+        let id = id.to_owned();
+        self.call(move |db| {
+            let enc: String = db
+                .query_row("SELECT encryption FROM sessions WHERE id=?1", [&id], |r| r.get(0))
+                .optional()?
+                .ok_or_else(|| anyhow!("Session not found"))?;
+            ensure!(enc == "full", "Only full-encrypted sessions can be locked");
+            with_vault(|v| {
+                v.lock_full(&id);
+                Ok(())
+            })?;
+            load_session(db, &id)
+        })
+        .await
+    }
+    pub async fn set_session_encryption(
+        &self,
+        id: &str,
+        mode: &str,
+        password: Option<String>,
+    ) -> Result<Session> {
+        ensure!(
+            matches!(mode, "none" | "half" | "full"),
+            "Unsupported encryption mode"
+        );
+        let id = id.to_owned();
+        let mode = mode.to_owned();
+        self.call(move |db| {
+            let tx = db.transaction()?;
+            let (current, enc_meta, status): (String, Option<String>, String) = tx
+                .query_row(
+                    "SELECT encryption, enc_meta, status FROM sessions WHERE id=?1",
+                    [&id],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                )
+                .optional()?
+                .ok_or_else(|| anyhow!("Session not found"))?;
+            ensure!(
+                !matches!(
+                    status.as_str(),
+                    "running" | "compacting" | "auto_compacting" | "waiting_for_answer" | "waiting_for_network"
+                ),
+                "Cannot change encryption while session is active"
+            );
+            if current == mode {
+                return load_session(&tx, &id);
+            }
+            let old_key: Option<[u8; 32]> = match current.as_str() {
+                "none" => None,
+                "half" => Some(with_vault(|v| session_crypto::ensure_half_key(&tx, v, &id))?),
+                "full" => {
+                    let cached = with_vault(|v| Ok(v.get_full(&id)))?;
+                    if let Some(k) = cached {
+                        Some(k)
+                    } else {
+                        let pw = password
+                            .as_deref()
+                            .filter(|p| !p.is_empty())
+                            .ok_or_else(|| anyhow!("PASSWORD_REQUIRED: 请输入会话密码以解除或更改全加密"))?;
+                        let meta = enc_meta.as_deref().ok_or_else(|| anyhow!("Missing encryption metadata"))?;
+                        Some(session_crypto::verify_full_password(meta, &id, pw)?)
+                    }
+                }
+                _ => None,
+            };
+            let (new_key, new_meta): (Option<[u8; 32]>, Option<String>) = match mode.as_str() {
+                "none" => (None, None),
+                "half" => (
+                    Some(with_vault(|v| session_crypto::ensure_half_key(&tx, v, &id))?),
+                    None,
+                ),
+                "full" => {
+                    let pw = password
+                        .as_deref()
+                        .filter(|p| !p.is_empty())
+                        .ok_or_else(|| anyhow!("PASSWORD_REQUIRED: 全加密必须设置会话密码"))?;
+                    let (meta, key) = session_crypto::create_full_meta(pw, &id)?;
+                    (Some(key), Some(meta))
+                }
+                _ => unreachable!(),
+            };
+            let transform = |text: &str| -> Result<String> {
+                let plain = if session_crypto::is_encrypted(text) {
+                    let k = old_key.as_ref().ok_or_else(|| anyhow!("Missing decryption key"))?;
+                    session_crypto::decrypt_text(k, &id, text)?
+                } else {
+                    text.to_owned()
+                };
+                match &new_key {
+                    Some(k) => session_crypto::encrypt_text(k, &id, &plain),
+                    None => Ok(plain),
+                }
+            };
+            {
+                let mut stmt = tx.prepare("SELECT seq, data FROM events WHERE session_id=?1")?;
+                let rows = stmt
+                    .query_map([&id], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                for (seq, data) in rows {
+                    let updated = transform(&data)?;
+                    tx.execute("UPDATE events SET data=?2 WHERE seq=?1", params![seq, updated])?;
+                }
+            }
+            {
+                let mut stmt = tx.prepare("SELECT id, item FROM context_items WHERE session_id=?1")?;
+                let rows = stmt
+                    .query_map([&id], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                for (row_id, item) in rows {
+                    let updated = transform(&item)?;
+                    tx.execute(
+                        "UPDATE context_items SET item=?2 WHERE id=?1",
+                        params![row_id, updated],
+                    )?;
+                }
+            }
+            {
+                let mut stmt = tx.prepare("SELECT call_id, args, output FROM executions WHERE session_id=?1")?;
+                let rows = stmt
+                    .query_map([&id], |r| {
+                        Ok((
+                            r.get::<_, String>(0)?,
+                            r.get::<_, String>(1)?,
+                            r.get::<_, String>(2)?,
+                        ))
+                    })?
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                for (call_id, args, output) in rows {
+                    let updated_args = transform(&args)?;
+                    let updated_output = if output.is_empty() {
+                        String::new()
+                    } else {
+                        transform(&output)?
+                    };
+                    tx.execute(
+                        "UPDATE executions SET args=?3, output=?4 WHERE session_id=?1 AND call_id=?2",
+                        params![id, call_id, updated_args, updated_output],
+                    )?;
+                }
+            }
+            tx.execute(
+                "UPDATE sessions SET encryption=?2, enc_meta=?3, updated_at=?4 WHERE id=?1",
+                params![id, mode, new_meta, now()],
+            )?;
+            if mode != "half" {
+                let _ = session_crypto::remove_half_slot(&tx, &id);
+            }
+            tx.commit()?;
+            with_vault(|v| {
+                if mode == "full" {
+                    if let Some(k) = new_key {
+                        v.set_full(&id, k);
+                    }
+                } else {
+                    v.lock_full(&id);
+                }
+                if mode != "half" {
+                    v.remove_all(&id);
+                    if mode == "full"
+                        && let Some(k) = new_key
+                    {
+                        v.set_full(&id, k);
+                    }
+                }
+                Ok(())
+            })?;
+            load_session(db, &id)
+        })
+        .await
+    }
+    pub async fn delete_session(&self, id: &str) -> Result<()> {
+        let id = id.to_owned();
+        let id_fs = id.clone();
+        let sessions_dir = self.data_dir.join("sessions");
+        self.call(move |db| {
+            let tx = db.transaction()?;
+            let status: Option<String> = tx
+                .query_row("SELECT status FROM sessions WHERE id=?1", [&id], |r| r.get(0))
+                .optional()?;
+            let Some(status) = status else {
+                bail!("Session not found");
+            };
+            ensure!(
+                !matches!(
+                    status.as_str(),
+                    "running" | "compacting" | "auto_compacting" | "waiting_for_answer" | "waiting_for_network"
+                ),
+                "Cannot delete an active session; stop it first"
+            );
+            tx.execute("UPDATE sessions SET parent_id=NULL WHERE parent_id=?1", [&id])?;
+            for table in [
+                "agent_inbox",
+                "agent_goals",
+                "agent_questions",
+                "message_queue",
+                "message_escalations",
+                "accepted_messages",
+                "executions",
+                "context_items",
+                "events",
+            ] {
+                tx.execute(&format!("DELETE FROM {table} WHERE session_id=?1"), [&id])?;
+            }
+            tx.execute("DELETE FROM sessions WHERE id=?1", [&id])?;
+            let _ = session_crypto::remove_half_slot(&tx, &id);
+            tx.commit()?;
+            with_vault(|v| {
+                v.remove_all(&id);
+                Ok(())
+            })?;
+            Ok(())
+        })
+        .await?;
+        let jsonl = sessions_dir.join(format!("{id_fs}.jsonl"));
+        if jsonl.exists() {
+            let _ = std::fs::remove_file(jsonl);
+        }
+        let dir = sessions_dir.join(&id_fs);
+        if dir.exists() {
+            let _ = std::fs::remove_dir_all(dir);
+        }
+        Ok(())
     }
     pub async fn update_session_settings(
         &self,
@@ -350,9 +675,14 @@ impl Store {
     pub async fn events(&self, id: &str, after: i64) -> Result<Vec<Event>> {
         let id = id.to_owned();
         self.call(move|db|{
+            let _ = session_key(db, &id)?;
             let mut stmt=db.prepare("SELECT seq,session_id,kind,data,created_at FROM events WHERE session_id=?1 AND seq>?2 ORDER BY seq")?;
             let rows=stmt.query_map(params![id,after],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get::<_,String>(3)?,r.get(4)?)))?;
-            rows.map(|r| { let (seq,session_id,kind,data,created_at)=r?;Ok(Event{seq,session_id,kind,data:serde_json::from_str(&data)?,created_at}) }).collect()
+            rows.map(|r| {
+                let (seq, session_id, kind, data, created_at): (i64, String, String, String, String) = r?;
+                let plain = dec_str(db, &session_id, &data)?;
+                Ok(Event{seq,session_id,kind,data:serde_json::from_str(&plain)?,created_at})
+            }).collect()
         }).await
     }
     pub async fn append_event(&self, id: &str, kind: &str, data: Value) -> Result<Event> {
@@ -369,9 +699,13 @@ impl Store {
     pub async fn context(&self, id: &str) -> Result<Vec<Value>> {
         let id = id.to_owned();
         self.call(move|db|{
+            let _ = session_key(db, &id)?;
             let mut stmt=db.prepare("SELECT item FROM context_items WHERE session_id=?1 AND epoch=(SELECT context_epoch FROM sessions WHERE id=?1) ORDER BY id")?;
-            let rows=stmt.query_map([id],|r|r.get::<_,String>(0))?;
-            rows.map(|r|Ok(serde_json::from_str(&r?)?)).collect()
+            let rows=stmt.query_map([&id],|r|r.get::<_,String>(0))?;
+            rows.map(|r|{
+                let plain = dec_str(db, &id, &r?)?;
+                Ok(serde_json::from_str(&plain)?)
+            }).collect()
         }).await
     }
     pub async fn append_context(&self, id: &str, items: Vec<Value>) -> Result<()> {
@@ -453,8 +787,13 @@ impl Store {
         self.call(move|db|{
             let tx=db.transaction()?;
             let prior:Option<(String,String)>=tx.query_row("SELECT name,args FROM executions WHERE session_id=?1 AND call_id=?2",params![id,call_id],|r|Ok((r.get(0)?,r.get(1)?))).optional()?;
-            if let Some((n,a))=prior {ensure!(n==name && serde_json::from_str::<Value>(&a)?==args,"Tool call identity collision: arguments differ");return Ok(false);}
-            tx.execute("INSERT INTO executions(session_id,call_id,name,args,status) VALUES(?1,?2,?3,?4,'running')",params![id,call_id,name,serde_json::to_string(&args)?])?;
+            if let Some((n,a))=prior {
+                let plain_a = dec_str(&tx, &id, &a)?;
+                ensure!(n==name && serde_json::from_str::<Value>(&plain_a)?==args,"Tool call identity collision: arguments differ");
+                return Ok(false);
+            }
+            let enc_args = enc_str(&tx, &id, &serde_json::to_string(&args)?)?;
+            tx.execute("INSERT INTO executions(session_id,call_id,name,args,status) VALUES(?1,?2,?3,?4,'running')",params![id,call_id,name,enc_args])?;
             event(&tx,&id,"tool_start",json!({"call_id":call_id,"name":name,"args":args}))?;tx.commit()?;Ok(true)
         }).await
     }
@@ -495,13 +834,14 @@ impl Store {
             if matches!(status.as_deref(), Some("succeeded" | "failed")) {
                 return Ok(());
             }
+            let enc_output = enc_str(&tx, &id, &output)?;
             tx.execute(
                 "UPDATE executions SET status=?3,output=?4 WHERE session_id=?1 AND call_id=?2",
                 params![
                     id,
                     call_id,
                     if is_error { "failed" } else { "succeeded" },
-                    output
+                    enc_output
                 ],
             )?;
             context_items(
@@ -535,13 +875,17 @@ impl Store {
         let id = id.to_owned();
         let call_id = call_id.to_owned();
         self.call(move |db| {
-            Ok(db
+            let row = db
                 .query_row(
                     "SELECT status,output FROM executions WHERE session_id=?1 AND call_id=?2",
                     params![id, call_id],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
+                    |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
                 )
-                .optional()?)
+                .optional()?;
+            match row {
+                Some((status, output)) => Ok(Some((status, dec_str(db, &id, &output)?))),
+                None => Ok(None),
+            }
         })
         .await
     }
@@ -687,8 +1031,15 @@ impl SessionMirror {
             changes: 0,
         };
         for id in all_session_ids(db)? {
-            mirror.replace_log(&id, session_log_text(db, &id)?.as_bytes())?;
-            mirror.known.insert(id);
+            let enc: String = db
+                .query_row("SELECT encryption FROM sessions WHERE id=?1", [&id], |r| r.get(0))
+                .unwrap_or_else(|_| "none".into());
+            if enc == "none" {
+                mirror.replace_log(&id, session_log_text(db, &id)?.as_bytes())?;
+                mirror.known.insert(id);
+            } else {
+                let _ = std::fs::remove_file(mirror.path(&id)?);
+            }
         }
         mirror.cursor =
             db.query_row("SELECT COALESCE(MAX(seq),0) FROM events", [], |r| r.get(0))?;
@@ -727,16 +1078,39 @@ impl SessionMirror {
         if self.changes == db.total_changes() {
             return Ok(());
         }
-        // Write a versioned header before any events of a newly created session.
-        for id in all_session_ids(db)? {
-            if !self.known.contains(&id) {
+        let active_ids: HashSet<String> = all_session_ids(db)?.into_iter().collect();
+        let removed: Vec<String> = self
+            .known
+            .iter()
+            .filter(|id| !active_ids.contains(*id))
+            .cloned()
+            .collect();
+        for id in removed {
+            if let Ok(path) = self.path(&id) {
+                let _ = std::fs::remove_file(path);
+            }
+            self.known.remove(&id);
+        }
+        // Write a versioned header before any events of a newly created unencrypted session.
+        for id in &active_ids {
+            let enc: String = db
+                .query_row("SELECT encryption FROM sessions WHERE id=?1", [id], |r| r.get(0))
+                .unwrap_or_else(|_| "none".into());
+            if enc != "none" {
+                if let Ok(path) = self.path(id) {
+                    let _ = std::fs::remove_file(path);
+                }
+                self.known.remove(id);
+                continue;
+            }
+            if !self.known.contains(id) {
                 let header =
-                    json!({"type":"session","schema_version":1,"session":load_session(db,&id)?});
+                    json!({"type":"session","schema_version":1,"session":load_session(db,id)?});
                 self.replace_log(
-                    &id,
+                    id,
                     format!("{}\n", serde_json::to_string(&header)?).as_bytes(),
                 )?;
-                self.known.insert(id);
+                self.known.insert(id.clone());
             }
         }
         let mut stmt = db.prepare(
@@ -753,6 +1127,13 @@ impl SessionMirror {
         })?;
         for row in rows {
             let (seq, id, kind, data, created_at) = row?;
+            let enc: String = db
+                .query_row("SELECT encryption FROM sessions WHERE id=?1", [&id], |r| r.get(0))
+                .unwrap_or_else(|_| "none".into());
+            if enc != "none" {
+                self.cursor = seq;
+                continue;
+            }
             let data = portable_log_value(&serde_json::from_str::<Value>(&data)?);
             let event = Event {
                 seq,
@@ -818,11 +1199,12 @@ fn session_log_text(db: &Connection, id: &str) -> Result<String> {
     })?;
     for row in rows {
         let (seq, kind, data, created_at) = row?;
+        let plain = dec_str(db, id, &data)?;
         let event = Event {
             seq,
             session_id: id.to_owned(),
             kind,
-            data: portable_log_value(&serde_json::from_str::<Value>(&data)?),
+            data: portable_log_value(&serde_json::from_str::<Value>(&plain)?),
             created_at,
         };
         text.push_str(&serde_json::to_string(&event)?);
@@ -838,7 +1220,8 @@ fn load_config(db: &Connection) -> Result<AppConfig> {
     Ok(serde_json::from_str(&s)?)
 }
 pub(crate) fn load_session(db: &Connection, id: &str) -> Result<Session> {
-    let raw=db.query_row("SELECT id,title,cwd,selection,status,created_at,updated_at,parent_id,depth,context_epoch,reasoning_effort FROM sessions WHERE id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get::<_,String>(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?,r.get::<_,Option<String>>(10)?))).optional()?.ok_or_else(||anyhow!("Session not found"))?;
+    let raw: (String, String, String, String, String, String, String, Option<String>, u32, u32, Option<String>, String) = db.query_row("SELECT id,title,cwd,selection,status,created_at,updated_at,parent_id,depth,context_epoch,reasoning_effort,encryption FROM sessions WHERE id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?,r.get(10)?,r.get(11)?))).optional()?.ok_or_else(||anyhow!("Session not found"))?;
+    let locked = raw.11 == "full" && with_vault(|v| Ok(v.get_full(&raw.0).is_none())).unwrap_or(true);
     Ok(Session {
         id: raw.0,
         title: raw.1,
@@ -851,13 +1234,16 @@ pub(crate) fn load_session(db: &Connection, id: &str) -> Result<Session> {
         depth: raw.8,
         context_epoch: raw.9,
         reasoning_effort: raw.10,
+        encryption: raw.11,
+        locked,
     })
 }
 pub(crate) fn event(tx: &Transaction<'_>, id: &str, kind: &str, data: Value) -> Result<Event> {
     let created_at = now();
+    let stored = enc_str(tx, id, &serde_json::to_string(&data)?)?;
     tx.execute(
         "INSERT INTO events(session_id,kind,data,created_at) VALUES(?1,?2,?3,?4)",
-        params![id, kind, serde_json::to_string(&data)?, created_at],
+        params![id, kind, stored, created_at],
     )?;
     Ok(Event {
         seq: tx.last_insert_rowid(),
@@ -874,9 +1260,10 @@ pub(crate) fn context_items(tx: &Transaction<'_>, id: &str, items: Vec<Value>) -
         |r| r.get(0),
     )?;
     for item in items {
+        let stored = enc_str(tx, id, &serde_json::to_string(&item)?)?;
         tx.execute(
             "INSERT INTO context_items(session_id,epoch,item) VALUES(?1,?2,?3)",
-            params![id, epoch, serde_json::to_string(&item)?],
+            params![id, epoch, stored],
         )?;
     }
     Ok(())
@@ -898,6 +1285,11 @@ fn recover_interrupted(db: &mut Connection) -> Result<()> {
             "UPDATE executions SET status='unknown' WHERE session_id=?1 AND status='running'",
             [&id],
         )?;
+        let enc: String = tx.query_row("SELECT encryption FROM sessions WHERE id=?1", [&id], |r| r.get(0))?;
+        if enc == "full" {
+            tx.commit()?;
+            continue;
+        }
         let items = {
             let mut s=tx.prepare("SELECT item FROM context_items WHERE session_id=?1 AND epoch=(SELECT context_epoch FROM sessions WHERE id=?1) ORDER BY id")?;
             s.query_map([&id], |r| r.get::<_, String>(0))?
@@ -906,7 +1298,8 @@ fn recover_interrupted(db: &mut Connection) -> Result<()> {
         let mut calls = Vec::new();
         let mut results = HashSet::new();
         for item in items {
-            let item: Value = serde_json::from_str(&item)?;
+            let plain = dec_str(&tx, &id, &item)?;
+            let item: Value = serde_json::from_str(&plain)?;
             match item["type"].as_str() {
                 Some("function_call") => {
                     if let Some(cid) = item["call_id"].as_str() {
@@ -1541,5 +1934,69 @@ mod tests {
             .unwrap();
         assert_eq!(s.context(id).await.unwrap().len(), 1);
         assert_eq!(s.tool_result(id, "call").await.unwrap().unwrap().1, "ok");
+    }
+    #[tokio::test]
+    async fn session_encryption_half_full_unlock_decrypt_and_delete() {
+        let d = tempfile::tempdir().unwrap();
+        let path = d.path().join("db");
+        let s = Store::open(&path).unwrap();
+        let session = s
+            .create_session(
+                "Secret Chat".into(),
+                "/tmp".into(),
+                Selection {
+                    site_id: "s".into(),
+                    key_id: "k".into(),
+                    model_id: "m".into(),
+                },
+                None,
+                0,
+            )
+            .await
+            .unwrap();
+        let id = &session.id;
+        s.append_event(id, "user_message", json!({"text": "top-secret-msg"}))
+            .await
+            .unwrap();
+        assert!(d.path().join("sessions").join(format!("{id}.jsonl")).exists());
+
+        // Half encryption: AES-256-GCM in SQLite, no plaintext .jsonl, seamless read
+        let half = s.set_session_encryption(id, "half", None).await.unwrap();
+        assert_eq!(half.encryption, "half");
+        assert!(!half.locked);
+        assert!(!d.path().join("sessions").join(format!("{id}.jsonl")).exists());
+        let raw_db = Connection::open(&path).unwrap();
+        let raw_data: String = raw_db
+            .query_row("SELECT data FROM events WHERE session_id=?1", [id], |r| r.get(0))
+            .unwrap();
+        assert!(session_crypto::is_encrypted(&raw_data));
+        assert!(!raw_data.contains("top-secret-msg"));
+        assert_eq!(s.events(id, 0).await.unwrap()[0].data["text"], "top-secret-msg");
+
+        // Full encryption with password, lock, wrong/right unlock, decrypt, delete
+        let full = s
+            .set_session_encryption(id, "full", Some("my-pass".into()))
+            .await
+            .unwrap();
+        assert_eq!(full.encryption, "full");
+        assert!(!full.locked);
+        let locked = s.lock_session(id).await.unwrap();
+        assert!(locked.locked);
+        assert!(s.events(id, 0).await.is_err());
+        assert!(s.unlock_session(id, "wrong").await.is_err());
+        let unlocked = s.unlock_session(id, "my-pass").await.unwrap();
+        assert!(!unlocked.locked);
+        assert_eq!(s.events(id, 0).await.unwrap()[0].data["text"], "top-secret-msg");
+
+        let plain = s
+            .set_session_encryption(id, "none", Some("my-pass".into()))
+            .await
+            .unwrap();
+        assert_eq!(plain.encryption, "none");
+        assert!(d.path().join("sessions").join(format!("{id}.jsonl")).exists());
+
+        s.delete_session(id).await.unwrap();
+        assert!(!d.path().join("sessions").join(format!("{id}.jsonl")).exists());
+        assert!(s.session(id).await.is_err());
     }
 }

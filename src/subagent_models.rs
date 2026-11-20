@@ -103,6 +103,8 @@ mod tests {
             parent_id: None,
             depth: 0,
             context_epoch: 0,
+            encryption: "none".into(),
+            locked: false,
         };
         (cfg, s)
     }

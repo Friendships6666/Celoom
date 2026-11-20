@@ -25,8 +25,8 @@ use std::{
 use tokio::sync::{Mutex, mpsc, oneshot};
 
 const MAX_PREVIEW: u64 = 32 * 1024 * 1024;
-const MAX_ENTRIES: usize = 50_000;
-const MAX_DIRS: usize = 4096;
+const MAX_ENTRIES: usize = 200_000;
+const MAX_DIRS: usize = 32_768;
 const MAX_DEPTH: usize = 64;
 const MAX_WORKSPACES: usize = 32;
 const MAX_SESSIONS: usize = 1024;
@@ -45,6 +45,17 @@ const IGNORED: &[&str] = &[
     ".venv",
     "venv",
     "__pycache__",
+    ".cache",
+    ".cargo",
+    ".rustup",
+    ".npm",
+    ".pnpm-store",
+    ".yarn",
+    ".gradle",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
 ];
 
 type Snapshot = BTreeMap<String, Stamp>;
@@ -584,10 +595,10 @@ impl WatchState {
                         continue;
                     }
                     let kind = if old.is_some() { "modified" } else { "new" };
-                    ensure!(
-                        old.is_some() || self.known.len() < MAX_ENTRIES,
-                        "Workspace exceeds {MAX_ENTRIES} tracked entries"
-                    );
+                    if old.is_none() && self.known.len() >= MAX_ENTRIES {
+                        tracing::warn!("Workspace reached {MAX_ENTRIES} tracked entries; skipping additional watcher entries");
+                        continue;
+                    }
                     self.known.insert(path.clone(), stamp);
                     changes.insert(
                         path,
@@ -618,11 +629,11 @@ fn scan(root: &Path, private_root: Option<&Path>) -> Result<Snapshot> {
     let mut pending = vec![String::new()];
     let mut dirs = 0usize;
     while let Some(path) = pending.pop() {
+        if dirs >= MAX_DIRS {
+            tracing::warn!("Workspace reached {MAX_DIRS} watched directories; truncating scan");
+            break;
+        }
         dirs += 1;
-        ensure!(
-            dirs <= MAX_DIRS,
-            "Workspace exceeds {MAX_DIRS} watched directories"
-        );
         let directory = match open_relative(root, &path, private_root) {
             Ok(directory) => directory,
             Err(_) if !path.is_empty() => continue, // concurrent removal or inaccessible subtree
@@ -653,10 +664,10 @@ fn scan(root: &Path, private_root: Option<&Path>) -> Result<Snapshot> {
                 pending.push(relative.clone());
             }
             result.insert(relative, Stamp::from_meta(&meta));
-            ensure!(
-                result.len() <= MAX_ENTRIES,
-                "Workspace exceeds {MAX_ENTRIES} tracked entries"
-            );
+            if result.len() >= MAX_ENTRIES {
+                tracing::warn!("Workspace reached {MAX_ENTRIES} tracked entries; truncating scan");
+                return Ok(result);
+            }
         }
     }
     Ok(result)

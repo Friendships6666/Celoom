@@ -21,7 +21,7 @@ cargo build --release --locked
 --bind IP             监听地址，默认 127.0.0.1
 --port PORT           监听端口，默认 4141
 --workspace PATH      默认工作目录
---data-dir PATH       数据目录，默认 ~/.local/share/celoom
+--data-dir PATH       数据目录，默认 ~/.celoom
 --public-url URL      远程访问的 HTTPS 地址
 ```
 

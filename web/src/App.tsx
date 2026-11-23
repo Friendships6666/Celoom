@@ -153,7 +153,7 @@ function Workspace({ bootstrap, theme, toggleTheme, onLoggedOut }: { bootstrap: 
   function copySessionPath(session: Session) {
     const base = (bootstrap.data_dir || '').replace(/\/+$/, '');
     const encrypted = session.encryption === 'half' || session.encryption === 'full';
-    const path = base ? (encrypted ? `${base}/justaiagent.db` : `${base}/sessions/${session.id}.jsonl`) : `${session.id}.jsonl`;
+    const path = base ? (encrypted ? `${base}/celoom.sqlite3` : `${base}/sessions/${session.id}.jsonl`) : `${session.id}.jsonl`;
     if (navigator.clipboard?.writeText) {
       void navigator.clipboard.writeText(path).then(() => {
         setCopiedId(session.id);

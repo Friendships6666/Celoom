@@ -20,18 +20,20 @@ function build256Palette(theme: 'light' | 'dark'): string[] {
   for (let i = 1; i < 256; i++) {
     const t = i / 255;
     if (theme === 'dark') {
-      // 256-color dark bioluminescent spectrum: deep teal -> cyan -> sky -> indigo -> violet -> magenta
-      const hue = (172 + t * 142) % 360;
-      const sat = 72 + Math.sin(t * Math.PI) * 22;
-      const light = 46 + t * 24;
-      const alpha = 0.08 + Math.pow(t, 0.82) * 0.62;
+      // Rich 256-color bioluminescent spectrum sweeping 320 deg:
+      // emerald -> cyan -> sky -> indigo -> violet -> magenta -> coral-amber
+      const hue = (150 + t * 290) % 360;
+      const sat = 76 + Math.sin(t * Math.PI * 2) * 16;
+      const light = 42 + t * 28;
+      const alpha = 0.08 + Math.pow(t, 0.78) * 0.62;
       lut[i] = `hsla(${hue.toFixed(1)}, ${sat.toFixed(0)}%, ${light.toFixed(0)}%, ${alpha.toFixed(3)})`;
     } else {
-      // 256-color light botanical bloom spectrum: blush rose -> crimson -> coral -> amber -> plum
-      const hue = (342 + t * 88) % 360;
-      const sat = 58 + Math.sin(t * Math.PI) * 24;
-      const light = 64 - t * 22;
-      const alpha = 0.06 + Math.pow(t, 0.85) * 0.42;
+      // Rich 256-color botanical prism sweeping 300 deg:
+      // rose -> crimson -> coral -> amber -> sage-teal -> cobalt -> plum
+      const hue = (335 + t * 285) % 360;
+      const sat = 62 + Math.sin(t * Math.PI * 2) * 18;
+      const light = 66 - t * 22;
+      const alpha = 0.06 + Math.pow(t, 0.8) * 0.42;
       lut[i] = `hsla(${hue.toFixed(1)}, ${sat.toFixed(0)}%, ${light.toFixed(0)}%, ${alpha.toFixed(3)})`;
     }
   }
@@ -41,18 +43,25 @@ function build256Palette(theme: 'light' | 'dark'): string[] {
 const DARK_LUT = build256Palette('dark');
 const LIGHT_LUT = build256Palette('light');
 
+function hexNibble(code: number): number {
+  if (code >= 48 && code <= 57) return code - 48;
+  if (code >= 97 && code <= 102) return code - 87;
+  if (code >= 65 && code <= 70) return code - 55;
+  return 0;
+}
+
 function createGlowSprite(color: string): HTMLCanvasElement {
   const off = document.createElement('canvas');
-  off.width = 64;
-  off.height = 64;
+  off.width = 48;
+  off.height = 48;
   const octx = off.getContext('2d');
   if (octx) {
-    const grad = octx.createRadialGradient(32, 32, 2, 32, 32, 32);
+    const grad = octx.createRadialGradient(24, 24, 2, 24, 24, 24);
     grad.addColorStop(0, color);
-    grad.addColorStop(0.45, color.replace(/[\d.]+\)$/, '0.22)'));
+    grad.addColorStop(0.5, color.replace(/[\d.]+\)$/, '0.18)'));
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     octx.fillStyle = grad;
-    octx.fillRect(0, 0, 64, 64);
+    octx.fillRect(0, 0, 48, 48);
   }
   return off;
 }
@@ -80,12 +89,16 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
         }
         const total = parsed.cols * parsed.rows;
         if (parsed.cells.length !== total * 2) return;
-        const buf = new Uint8Array(total);
+        let buf = decodedRef.current;
+        if (buf.length !== total) {
+          buf = new Uint8Array(total);
+          decodedRef.current = buf;
+        }
+        const cells = parsed.cells;
         for (let i = 0; i < total; i++) {
-          buf[i] = parseInt(parsed.cells.slice(i * 2, i * 2 + 2), 16) || 0;
+          buf[i] = (hexNibble(cells.charCodeAt(i * 2)) << 4) | hexNibble(cells.charCodeAt(i * 2 + 1));
         }
         frameRef.current = parsed;
-        decodedRef.current = buf;
       } catch {
         /* Ignore malformed frame. */
       }
@@ -102,8 +115,8 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
     if (!ctx) return;
 
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    const darkGlow = createGlowSprite('rgba(86, 223, 223, 0.55)');
-    const lightGlow = createGlowSprite('rgba(168, 48, 82, 0.35)');
+    const darkGlow = createGlowSprite('rgba(86, 223, 223, 0.50)');
+    const lightGlow = createGlowSprite('rgba(168, 48, 82, 0.32)');
     let rafId = 0;
     let width = 0;
     let height = 0;
@@ -123,7 +136,7 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
     const draw = (now: number) => {
       const frame = frameRef.current;
       const mode = frame?.mode ?? 'idle';
-      const minInterval = mode === 'idle' ? 50 : 28; // ~20fps idle, ~35fps active for low CPU
+      const minInterval = mode === 'idle' ? 40 : 28; // ~25fps idle, ~35fps active
       if (!reducedMotion && now - lastDraw < minInterval) {
         rafId = window.requestAnimationFrame(draw);
         return;
@@ -141,24 +154,24 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
       const total = cols * rows;
       const cellW = width / cols;
       const cellH = height / rows;
-      const energy = frame?.energy ?? 0.08;
+      const energy = frame?.energy ?? 0.1;
 
       if (displayRef.current.length !== total) {
         displayRef.current = new Float32Array(total);
       }
       const target = decodedRef.current;
       const disp = displayRef.current;
-      const lerpRate = mode === 'idle' ? 0.14 : 0.28;
+      const lerpRate = mode === 'idle' ? 0.20 : 0.34;
       if (target.length === total) {
         for (let i = 0; i < total; i++) {
           disp[i] += (target[i] - disp[i]) * lerpRate;
         }
       }
 
-      // Subtle breathing grid lines scaled by AI activity.
+      // Subtle rhythmic grid mesh.
       ctx.strokeStyle = isDark ? 'rgba(86, 223, 223, 0.045)' : 'rgba(136, 39, 63, 0.045)';
-      ctx.lineWidth = mode === 'swarm' || mode === 'tooling' ? 0.9 : 0.6;
-      ctx.globalAlpha = Math.min(1, 0.4 + energy * 0.8);
+      ctx.lineWidth = mode === 'swarm' || mode === 'tooling' ? 0.85 : 0.6;
+      ctx.globalAlpha = Math.min(1, 0.38 + energy * 0.72);
       ctx.beginPath();
       for (let x = 1; x < cols; x++) {
         const px = Math.round(x * cellW) + 0.5;
@@ -173,48 +186,44 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
       ctx.stroke();
       ctx.globalAlpha = 1;
 
-      const pulse = reducedMotion ? 1 : 0.9 + 0.1 * Math.sin(now * (mode === 'idle' ? 0.0018 : 0.0045));
-      const padX = Math.max(1.5, cellW * 0.14);
-      const padY = Math.max(1.5, cellH * 0.14);
+      const phaseShift = reducedMotion ? 0 : Math.floor((now * (mode === 'idle' ? 0.015 : 0.04)) % 255);
+      const padX = Math.max(1.5, cellW * 0.16);
+      const padY = Math.max(1.5, cellH * 0.16);
       const baseW = Math.max(2, cellW - padX * 2);
       const baseH = Math.max(2, cellH - padY * 2);
-      const radius = Math.min(baseW, baseH) * 0.34;
 
       for (let y = 0; y < rows; y++) {
         const rowOffset = y * cols;
         for (let x = 0; x < cols; x++) {
           const val = disp[rowOffset + x];
-          const idx = Math.min(255, Math.round(val));
-          if (idx <= 2) continue;
+          const rawIdx = Math.min(255, Math.round(val));
+          if (rawIdx <= 3) continue;
+
+          const t = rawIdx / 255;
+          // Subtle spatial-temporal harmonic color cycling across all 256 colors.
+          const colorIdx = 1 + ((rawIdx + phaseShift + ((x * 5 + y * 9) & 63)) % 255);
+          const wavePulse = reducedMotion ? 1 : 0.86 + 0.18 * Math.sin(now * 0.005 + x * 0.45 + y * 0.35);
 
           const px = x * cellW + padX;
           const py = y * cellH + padY;
-          const t = idx / 255;
 
-          // Pre-rendered radial halo for energetic cells (no expensive shadowBlur).
-          if (idx >= 120 && !reducedMotion) {
-            const haloSize = Math.max(cellW, cellH) * (1.7 + t * 0.9) * pulse;
+          if (rawIdx >= 150 && !reducedMotion) {
+            const haloSize = Math.max(cellW, cellH) * (1.5 + t * 0.9) * wavePulse;
             const cx = x * cellW + cellW * 0.5;
             const cy = y * cellH + cellH * 0.5;
-            ctx.globalAlpha = (t - 0.35) * 0.65;
+            ctx.globalAlpha = (t - 0.45) * 0.6;
             ctx.drawImage(glowSprite, cx - haloSize * 0.5, cy - haloSize * 0.5, haloSize, haloSize);
             ctx.globalAlpha = 1;
           }
 
-          const scale = 0.62 + t * 0.38 * pulse;
+          const scale = (0.52 + t * 0.46) * wavePulse;
           const sw = baseW * scale;
           const sh = baseH * scale;
           const sx = px + (baseW - sw) * 0.5;
           const sy = py + (baseH - sh) * 0.5;
 
-          ctx.fillStyle = lut[idx];
-          ctx.beginPath();
-          if (typeof ctx.roundRect === 'function') {
-            ctx.roundRect(sx, sy, sw, sh, Math.max(2, radius * scale));
-          } else {
-            ctx.rect(sx, sy, sw, sh);
-          }
-          ctx.fill();
+          ctx.fillStyle = lut[colorIdx];
+          ctx.fillRect(sx, sy, sw, sh);
         }
       }
 

@@ -99,7 +99,7 @@ impl Options {
         let mut data_dir = std::env::var_os("CELOOM_DATA_DIR")
             .or_else(|| std::env::var_os("JUSTAI_DATA_DIR"))
             .map(PathBuf::from)
-            .unwrap_or_else(|| home.join(".local/share/celoom"));
+            .unwrap_or_else(|| home.join(".celoom"));
         let mut workspace = cwd;
         let mut public = std::env::var("CELOOM_PUBLIC_URL")
             .or_else(|_| std::env::var("JUSTAI_PUBLIC_URL"))
@@ -255,11 +255,11 @@ async fn main() -> Result<()> {
                 }
                 let metrics = engine.automaton_metrics().await;
                 let interval_ms = if metrics.active_tools > 0 || metrics.active_subagents > 0 {
-                    180
+                    120
                 } else if metrics.active_sessions > 0 {
-                    260
+                    170
                 } else {
-                    520
+                    240
                 };
                 if tx.receiver_count() > 0 {
                     let frame = sim.step(metrics);

@@ -1,8 +1,8 @@
-//! Lightweight 256-color cellular bloom field driven by live AI work state.
+//! Excitable 256-color cyclic cellular wave automaton driven by live AI work state.
 //!
-//! Each cell holds a `u8` color/energy index (`0..=255`):
-//! - `0`: dormant
-//! - `1..=255`: 256-step spectrum encoding both cellular phase and decay.
+//! Unlike static Conway life rules that can freeze into 2x2 blocks, every active
+//! cell advances monotonically through a multi-hue excitable wave cycle (`0..=255`),
+//! producing continuous rhythmic ripples, spirals, and blooms at very low CPU cost.
 
 use serde::Serialize;
 
@@ -48,7 +48,7 @@ impl Automaton {
             grid: vec![0; cols * rows],
             scratch: vec![0; cols * rows],
         };
-        me.seed_bloom(cols / 2, rows / 2, 48, 2);
+        me.seed_wave(cols / 2, rows / 2, 220, 2);
         me
     }
 
@@ -61,46 +61,56 @@ impl Automaton {
         self.tick = self.tick.wrapping_add(1);
         let cols = self.cols;
         let rows = self.rows;
-        let active = mode != "idle";
 
-        // Inject energy only proportional to genuinely active work.
+        // Rhythmic pacemakers ensure the field never freezes or dies out.
         if metrics.active_subagents > 0 {
             let clusters = metrics.active_subagents.min(6);
             for k in 0..clusters {
                 let angle = (k as f64 / clusters as f64) * std::f64::consts::TAU
-                    + (self.tick as f64 * 0.22);
+                    + (self.tick as f64 * 0.28);
                 let cx = ((cols as f64 * 0.5) + angle.cos() * (cols as f64 * 0.30)) as usize;
                 let cy = ((rows as f64 * 0.5) + angle.sin() * (rows as f64 * 0.30)) as usize;
-                let hue = 192u8.saturating_add(((self.tick * 11 + k as u64 * 23) % 63) as u8);
-                self.seed_bloom(cx % cols, cy % rows, hue, 2);
+                let phase = 210u8.saturating_add(((self.tick * 17 + k as u64 * 31) % 45) as u8);
+                self.seed_wave(cx % cols, cy % rows, phase, 1);
             }
         }
         if metrics.active_tools > 0 {
             let bursts = metrics.active_tools.min(4);
             for b in 0..bursts {
-                let rx = (self.next_rand() as usize) % cols;
-                let ry = (self.next_rand() as usize) % rows;
-                let hue = 128u8.saturating_add(((self.tick * 13 + b as u64 * 19) % 63) as u8);
-                self.seed_bloom(rx, ry, hue, 1);
+                if (self.tick + b as u64) % 2 == 0 {
+                    let rx = (self.next_rand() as usize) % cols;
+                    let ry = (self.next_rand() as usize) % rows;
+                    let phase = 200u8.saturating_add(((self.tick * 19 + b as u64 * 29) % 55) as u8);
+                    self.seed_wave(rx, ry, phase, 1);
+                }
             }
         } else if metrics.active_sessions > 0 {
-            if self.tick % 2 == 0 {
-                let rx = (self.next_rand() as usize) % cols;
-                let ry = (self.next_rand() as usize) % rows;
-                let hue = 64u8.saturating_add(((self.tick * 9) % 63) as u8);
-                self.seed_bloom(rx, ry, hue, 1);
+            if self.tick % 3 == 0 {
+                let angle = self.tick as f64 * 0.22;
+                let cx = ((cols as f64 * 0.5) + angle.cos() * (cols as f64 * 0.22)) as usize;
+                let cy = ((rows as f64 * 0.5) + angle.sin() * (rows as f64 * 0.22)) as usize;
+                self.seed_wave(cx % cols, cy % rows, 215, 1);
             }
-        } else if self.tick % 5 == 0 {
-            // Calm, sparse idle spores.
-            let rx = (self.next_rand() as usize) % cols;
-            let ry = (self.next_rand() as usize) % rows;
-            let hue = 16u8.saturating_add(((self.tick * 7) % 44) as u8);
-            self.grid[ry * cols + rx] = hue;
+        } else if self.tick % 6 == 0 {
+            // Gentle orbiting idle pacemaker keeps calm rhythmic ripples flowing.
+            let angle = self.tick as f64 * 0.14;
+            let cx = ((cols as f64 * 0.5) + angle.cos() * (cols as f64 * 0.28)) as usize;
+            let cy = ((rows as f64 * 0.5) + angle.sin() * (rows as f64 * 0.28)) as usize;
+            self.seed_wave(cx % cols, cy % rows, 196, 1);
         }
 
-        // Fast 4-neighbor diffusion + gentle cellular life rule.
+        // Cyclic excitable wave transition:
+        // - Wavefront band: 170..=255 (triggers resting 0 neighbors into wave)
+        // - Refractory/color cascade: decays monotonically every tick so no cell can ever freeze!
+        let step_decay: u8 = match mode {
+            "swarm" => 13,
+            "tooling" => 15,
+            "thinking" => 17,
+            _ => 21,
+        };
+        let threshold: u8 = if mode == "idle" { 2 } else { 1 };
+
         let mut alive_cells = 0usize;
-        let decay: u8 = if active { 14 } else { 24 };
         for y in 0..rows {
             let y_up = if y == 0 { rows - 1 } else { y - 1 };
             let y_dn = if y + 1 == rows { 0 } else { y + 1 };
@@ -111,32 +121,34 @@ impl Automaton {
 
                 let idx = row_off + x;
                 let cur = self.grid[idx];
-                let n0 = self.grid[y_up * cols + x];
-                let n1 = self.grid[y_dn * cols + x];
-                let n2 = self.grid[row_off + x_lt];
-                let n3 = self.grid[row_off + x_rt];
-
-                let mut active_neighbors = 0u8;
-                let mut max_n = 0u8;
-                for n in [n0, n1, n2, n3] {
-                    if n >= 24 {
-                        active_neighbors += 1;
-                    }
-                    if n > max_n {
-                        max_n = n;
-                    }
-                }
 
                 let next = if cur > 0 {
-                    if active && (active_neighbors == 2 || active_neighbors == 3) {
-                        cur.saturating_add(7).min(255)
-                    } else {
-                        cur.saturating_sub(decay)
-                    }
-                } else if (active && active_neighbors == 2) || (!active && active_neighbors == 3) {
-                    max_n.saturating_sub(18).max(16)
+                    // Always advance downward through the 256-color spectrum -> 0 (never freezes).
+                    cur.saturating_sub(step_decay)
                 } else {
-                    0
+                    let neighbors = [
+                        self.grid[y_up * cols + x],
+                        self.grid[y_dn * cols + x],
+                        self.grid[row_off + x_lt],
+                        self.grid[row_off + x_rt],
+                    ];
+                    let mut excited = 0u8;
+                    let mut peak = 0u8;
+                    for n in neighbors {
+                        if n >= 168 {
+                            excited += 1;
+                            if n > peak {
+                                peak = n;
+                            }
+                        }
+                    }
+                    if excited >= threshold {
+                        // Shift phase slightly on propagation for rich multi-color wave fronts.
+                        let shift = ((x + y + (self.tick as usize)) & 3) as u8 * 7;
+                        peak.saturating_sub(8 + shift).max(168)
+                    } else {
+                        0
+                    }
                 };
 
                 if next > 0 {
@@ -160,7 +172,7 @@ impl Automaton {
             + (metrics.active_tools as f32 * 0.25)
             + (metrics.active_subagents as f32 * 0.35))
             .min(1.0);
-        let energy = (density * 0.9 + activity * 0.6).clamp(0.06, 1.0);
+        let energy = (density * 0.85 + activity * 0.6).clamp(0.08, 1.0);
 
         AutomatonFrame {
             cols,
@@ -192,15 +204,15 @@ impl Automaton {
         self.scratch = vec![0u8; new_cols * new_rows];
     }
 
-    fn seed_bloom(&mut self, cx: usize, cy: usize, state: u8, radius: usize) {
+    fn seed_wave(&mut self, cx: usize, cy: usize, state: u8, radius: usize) {
         let cols = self.cols;
         let rows = self.rows;
         for dy in 0..=radius {
             for dx in 0..=radius {
-                if dx + dy > radius + 1 {
+                if dx + dy > radius {
                     continue;
                 }
-                let val = state.saturating_sub(((dx + dy) * 14) as u8);
+                let val = state.saturating_sub(((dx + dy) * 18) as u8);
                 if val == 0 {
                     continue;
                 }
@@ -229,12 +241,12 @@ impl Automaton {
 fn target_layout(metrics: AutomatonMetrics) -> (usize, usize, &'static str) {
     if metrics.active_subagents > 0 {
         let extra = (metrics.active_subagents.min(5)) * 2;
-        (46 + extra, 26 + extra / 2, "swarm")
+        (40 + extra, 22 + extra / 2, "swarm")
     } else if metrics.active_tools > 0 {
         let extra = (metrics.active_tools.min(5)) * 2;
-        (38 + extra, 22 + extra / 2, "tooling")
+        (34 + extra, 19 + extra / 2, "tooling")
     } else if metrics.active_sessions > 0 {
-        (34, 20, "thinking")
+        (32, 18, "thinking")
     } else {
         (28, 16, "idle")
     }

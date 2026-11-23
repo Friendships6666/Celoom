@@ -255,11 +255,11 @@ async fn main() -> Result<()> {
                 }
                 let metrics = engine.automaton_metrics().await;
                 let interval_ms = if metrics.active_tools > 0 || metrics.active_subagents > 0 {
-                    85
+                    180
                 } else if metrics.active_sessions > 0 {
-                    125
+                    260
                 } else {
-                    210
+                    520
                 };
                 if tx.receiver_count() > 0 {
                     let frame = sim.step(metrics);

@@ -71,8 +71,13 @@ impl Engine {
         }
     }
     pub async fn automaton_metrics(&self) -> crate::automaton::AutomatonMetrics {
-        let active_sessions = self.inner.active.lock().await.len();
-        let active_subagents = self.inner.children.lock().await.len();
+        let active_map = self.inner.active.lock().await;
+        let children_map = self.inner.children.lock().await;
+        let active_sessions = active_map.len();
+        let active_subagents = children_map
+            .keys()
+            .filter(|id| active_map.contains_key(*id))
+            .count();
         let active_tools = self
             .inner
             .active_tools

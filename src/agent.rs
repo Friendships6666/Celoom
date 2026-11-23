@@ -1549,40 +1549,21 @@ impl Engine {
                                             }
                                         }
                                     }
-                                    Ok(Call::WebSearch(args)) => {
-                                        match engine.inner.store.config().await {
-                                            Ok(config) => {
-                                                crate::web_tools::search(
-                                                    args,
-                                                    config.search,
-                                                    config.network,
-                                                    cancel_clone,
-                                                )
-                                                .await
-                                            }
-                                            Err(err) => Err(err),
-                                        }
-                                    }
-                                    Ok(Call::WebFetch(args)) => {
-                                        match engine.inner.store.config().await {
-                                            Ok(config) => {
-                                                crate::web_tools::fetch(
-                                                    args,
-                                                    config.network,
-                                                    cancel_clone,
-                                                )
-                                                .await
-                                            }
-                                            Err(err) => Err(err),
-                                        }
+                                    Ok(Call::Dag(args)) => {
+                                        engine
+                                            .execute_dag(
+                                                &session_clone,
+                                                &snapshot_clone,
+                                                args,
+                                                cancel_clone,
+                                            )
+                                            .await
                                     }
                                     Ok(call) => {
                                         engine
-                                            .inner
-                                            .tools
-                                            .execute(
-                                                &session_clone.id,
-                                                Path::new(&session_clone.cwd),
+                                            .execute_leaf_call(
+                                                &session_clone,
+                                                &snapshot_clone,
                                                 call,
                                                 cancel_clone,
                                             )
@@ -1873,6 +1854,230 @@ impl Engine {
         }
         Ok(admitted)
     }
+    async fn execute_leaf_call(
+        &self,
+        session: &Session,
+        _snapshot: &Snapshot,
+        call: Call,
+        cancel: CancellationToken,
+    ) -> Result<String> {
+        match call {
+            Call::WebSearch(args) => {
+                let config = self.inner.store.config().await?;
+                crate::web_tools::search(args, config.search, config.network, cancel).await
+            }
+            Call::WebFetch(args) => {
+                let config = self.inner.store.config().await?;
+                crate::web_tools::fetch(args, config.network, cancel).await
+            }
+            other => {
+                self.inner
+                    .tools
+                    .execute(&session.id, Path::new(&session.cwd), other, cancel)
+                    .await
+            }
+        }
+    }
+
+    async fn execute_dag(
+        &self,
+        session: &Session,
+        snapshot: &Snapshot,
+        dag: crate::tools::DagArgs,
+        cancel: CancellationToken,
+    ) -> Result<String> {
+        use std::sync::atomic::Ordering;
+        let started_at = Instant::now();
+        let fail_fast = dag.fail_fast.unwrap_or(false);
+        let n = dag.nodes.len();
+        let mut status: Vec<&'static str> = vec!["pending"; n];
+        let mut outputs: Vec<String> = vec![String::new(); n];
+        let mut durations: Vec<u128> = vec![0; n];
+        let id_to_idx: HashMap<&str, usize> = dag
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(i, node)| (node.id.as_str(), i))
+            .collect();
+
+        loop {
+            if cancel.is_cancelled() {
+                for s in &mut status {
+                    if *s == "pending" {
+                        *s = "skipped";
+                    }
+                }
+                break;
+            }
+            let mut ready = Vec::new();
+            let mut progressed = false;
+
+            for i in 0..n {
+                if status[i] != "pending" {
+                    continue;
+                }
+                let deps = dag.nodes[i].deps.as_deref().unwrap_or(&[]);
+                let all_settled = deps.iter().all(|d| {
+                    id_to_idx
+                        .get(d.as_str())
+                        .is_some_and(|&idx| status[idx] != "pending")
+                });
+                if !all_settled {
+                    continue;
+                }
+                let cond = dag.nodes[i].on.as_deref().unwrap_or("success");
+                let should_run = match cond {
+                    "always" => true,
+                    "failure" => deps
+                        .iter()
+                        .any(|d| id_to_idx.get(d.as_str()).is_some_and(|&idx| status[idx] == "failed")),
+                    _ => deps.iter().all(|d| {
+                        id_to_idx
+                            .get(d.as_str())
+                            .is_some_and(|&idx| status[idx] == "succeeded")
+                    }),
+                };
+                if should_run {
+                    ready.push(i);
+                } else {
+                    status[i] = "skipped";
+                    progressed = true;
+                }
+            }
+
+            if ready.is_empty() {
+                if !progressed {
+                    break;
+                }
+                continue;
+            }
+
+            let batch_len = ready.len();
+            self.inner.active_tools.fetch_add(batch_len, Ordering::Relaxed);
+            let futs = ready.into_iter().map(|idx| {
+                let engine = self.clone();
+                let session_clone = session.clone();
+                let snapshot_clone = snapshot.clone();
+                let cancel_clone = cancel.clone();
+                let node = dag.nodes[idx].clone();
+                let mut replacements = Vec::new();
+                if let Some(deps) = &node.deps {
+                    for dep_id in deps {
+                        if let Some(&dep_idx) = id_to_idx.get(dep_id.as_str()) {
+                            replacements.push((
+                                format!("{{{{{dep_id}.output}}}}"),
+                                outputs[dep_idx].clone(),
+                            ));
+                            replacements.push((
+                                format!("{{{{{dep_id}.status}}}}"),
+                                status[dep_idx].to_owned(),
+                            ));
+                        }
+                    }
+                }
+                async move {
+                    let t0 = Instant::now();
+                    let res = async {
+                        let mut parsed = tools::parse_dag_node_args(&node.args)?;
+                        if !replacements.is_empty() {
+                            Self::interpolate_dag_value(&mut parsed, &replacements);
+                        }
+                        let call = tools::validate(&node.tool, &parsed)?;
+                        engine
+                            .execute_leaf_call(&session_clone, &snapshot_clone, call, cancel_clone)
+                            .await
+                    }
+                    .await;
+                    (idx, t0.elapsed().as_millis(), res)
+                }
+            });
+            let wave_results = futures_util::future::join_all(futs).await;
+            self.inner.active_tools.fetch_sub(batch_len, Ordering::Relaxed);
+
+            let mut wave_failed = false;
+            for (idx, elapsed_ms, res) in wave_results {
+                durations[idx] = elapsed_ms;
+                match res {
+                    Ok(out) => {
+                        status[idx] = "succeeded";
+                        outputs[idx] = out;
+                    }
+                    Err(err) => {
+                        status[idx] = "failed";
+                        outputs[idx] = self.safe_error(&err.to_string()).await;
+                        wave_failed = true;
+                    }
+                }
+            }
+
+            if fail_fast && wave_failed {
+                let has_failure_handler = (0..n).any(|i| {
+                    status[i] == "pending"
+                        && matches!(dag.nodes[i].on.as_deref(), Some("failure" | "always"))
+                });
+                if !has_failure_handler {
+                    for s in &mut status {
+                        if *s == "pending" {
+                            *s = "skipped";
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        let succeeded = status.iter().filter(|&&s| s == "succeeded").count();
+        let failed = status.iter().filter(|&&s| s == "failed").count();
+        let skipped = status.iter().filter(|&&s| s == "skipped").count();
+        let per_node_cap = (OUTPUT_LIMIT / n.max(1)).clamp(512, 8192);
+        let node_reports: Vec<Value> = dag
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(i, node)| {
+                json!({
+                    "id": node.id,
+                    "tool": node.tool,
+                    "status": status[i],
+                    "duration_ms": durations[i],
+                    "output": tools::bounded(&snapshot.redact(&outputs[i]), per_node_cap),
+                })
+            })
+            .collect();
+
+        Ok(serde_json::to_string(&json!({
+            "total": n,
+            "succeeded": succeeded,
+            "failed": failed,
+            "skipped": skipped,
+            "duration_ms": started_at.elapsed().as_millis(),
+            "nodes": node_reports,
+        }))?)
+    }
+
+    fn interpolate_dag_value(value: &mut Value, replacements: &[(String, String)]) {
+        match value {
+            Value::String(s) => {
+                for (pat, val) in replacements {
+                    if s.contains(pat) {
+                        *s = s.replace(pat, val);
+                    }
+                }
+            }
+            Value::Array(arr) => {
+                for item in arr {
+                    Self::interpolate_dag_value(item, replacements);
+                }
+            }
+            Value::Object(map) => {
+                for v in map.values_mut() {
+                    Self::interpolate_dag_value(v, replacements);
+                }
+            }
+            _ => {}
+        }
+    }
+
     async fn ensure_replay_route(
         &self,
         session: &Session,

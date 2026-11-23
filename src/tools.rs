@@ -130,6 +130,22 @@ pub struct GoalArgs {
     pub progress: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DagNode {
+    pub id: String,
+    pub tool: String,
+    pub args: Value,
+    pub deps: Option<Vec<String>>,
+    pub on: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DagArgs {
+    pub nodes: Vec<DagNode>,
+    pub fail_fast: Option<bool>,
+}
+
 pub enum Call {
     Computer(crate::computer::ComputerAction),
     AskUser(AskUserArgs),
@@ -145,6 +161,7 @@ pub enum Call {
     Bash(BashArgs),
     Job(JobArgs),
     Subagent(SubagentArgs),
+    Dag(DagArgs),
 }
 
 fn runtime_optional_fields(name: &str) -> &'static [&'static str] {
@@ -166,6 +183,7 @@ fn runtime_optional_fields(name: &str) -> &'static [&'static str] {
         "subagent" => &["task", "id", "wait_ms", "model_id"],
         "web_search" => &["max_results", "depth", "engine"],
         "web_fetch" => &["max_chars"],
+        "dag" => &["fail_fast"],
         _ => &[],
     }
 }
@@ -242,6 +260,7 @@ pub fn validate(name: &str, args: &Value) -> Result<Call> {
         "bash" => Call::Bash(serde_json::from_value(args.clone())?),
         "job" => Call::Job(serde_json::from_value(args.clone())?),
         "subagent" => Call::Subagent(serde_json::from_value(args.clone())?),
+        "dag" => Call::Dag(serde_json::from_value(args.clone())?),
         _ => unreachable!(),
     };
     match &call {
@@ -463,8 +482,109 @@ pub fn validate(name: &str, args: &Value) -> Result<Call> {
                 ),
             }
         }
+        Call::Dag(d) => {
+            validate_dag(d)?;
+        }
     }
     Ok(call)
+}
+
+pub fn parse_dag_node_args(raw: &Value) -> Result<Value> {
+    let v = match raw {
+        Value::String(s) => {
+            serde_json::from_str::<Value>(s).context("DAG node args string must be valid JSON")?
+        }
+        Value::Object(_) => raw.clone(),
+        _ => bail!("DAG node args must be a JSON object string or object"),
+    };
+    if !v.is_object() {
+        bail!("DAG node args must decode to a JSON object");
+    }
+    Ok(v)
+}
+
+fn validate_dag(dag: &DagArgs) -> Result<()> {
+    if dag.nodes.is_empty() || dag.nodes.len() > 32 {
+        bail!("DAG requires 1..=32 nodes");
+    }
+    let mut index_by_id = HashMap::with_capacity(dag.nodes.len());
+    for (idx, node) in dag.nodes.iter().enumerate() {
+        if node.id.is_empty()
+            || node.id.len() > 64
+            || !node
+                .id
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        {
+            bail!("Invalid DAG node id: {}", node.id);
+        }
+        if index_by_id.insert(node.id.as_str(), idx).is_some() {
+            bail!("Duplicate DAG node id: {}", node.id);
+        }
+        if !matches!(
+            node.tool.as_str(),
+            "read"
+                | "write"
+                | "edit"
+                | "glob"
+                | "grep"
+                | "bash"
+                | "job"
+                | "web_search"
+                | "web_fetch"
+                | "computer"
+        ) {
+            bail!("Unsupported tool inside DAG node '{}': {}", node.id, node.tool);
+        }
+        if let Some(cond) = node.on.as_deref()
+            && !matches!(cond, "success" | "failure" | "always")
+        {
+            bail!("Invalid DAG branch condition on '{}': {cond}", node.id);
+        }
+        let parsed_args = parse_dag_node_args(&node.args)?;
+        if !node.args.to_string().contains("{{") {
+            validate(&node.tool, &parsed_args)
+                .with_context(|| format!("Invalid args for DAG node '{}'", node.id))?;
+        }
+    }
+    // Topological cycle check via Kahn's algorithm.
+    let n = dag.nodes.len();
+    let mut indegree = vec![0usize; n];
+    let mut adj = vec![Vec::<usize>::new(); n];
+    for (idx, node) in dag.nodes.iter().enumerate() {
+        if let Some(deps) = &node.deps {
+            for dep in deps {
+                let &dep_idx = index_by_id
+                    .get(dep.as_str())
+                    .with_context(|| format!("DAG node '{}' depends on unknown node '{dep}'", node.id))?;
+                if dep_idx == idx {
+                    bail!("DAG node '{}' cannot depend on itself", node.id);
+                }
+                adj[dep_idx].push(idx);
+                indegree[idx] += 1;
+            }
+        }
+    }
+    let mut queue = VecDeque::new();
+    for (idx, &deg) in indegree.iter().enumerate() {
+        if deg == 0 {
+            queue.push_back(idx);
+        }
+    }
+    let mut visited = 0usize;
+    while let Some(u) = queue.pop_front() {
+        visited += 1;
+        for &v in &adj[u] {
+            indegree[v] -= 1;
+            if indegree[v] == 0 {
+                queue.push_back(v);
+            }
+        }
+    }
+    if visited != n {
+        bail!("DAG contains a dependency cycle");
+    }
+    Ok(())
 }
 fn valid_revision(r: &str) -> bool {
     r.len() == 64 && r.bytes().all(|c| c.is_ascii_hexdigit())
@@ -570,6 +690,28 @@ pub fn schemas() -> Vec<Value> {
             "subagent",
             "models lists the user's allowed subagent model choices (other fields null). spawn requires task; clone clones an existing child subagent by id with optional new task and model_id; omitted/null/inherit uses parent/source model. Max 4 children/depth 1. wait/cancel require child id, task/model_id null and wait_ms<=60000.",
             json!({"action":{"type":"string","enum":["models","spawn","clone","wait","cancel"]},"task":optional("string"),"id":optional("string"),"wait_ms":optional("integer"),"model_id":optional("string")}),
+        ),
+        function(
+            "dag",
+            "Execute a Directed Acyclic Graph (DAG) of tool calls in parallel waves with conditional branching on upstream success/failure to minimize model roundtrips. Independent nodes run concurrently; downstream nodes run once all deps finish and satisfy 'on' ('success' default | 'failure' | 'always'). String values in args may reference {{node_id.output}} or {{node_id.status}}. Allowed inner tools: read, write, edit, glob, grep, bash, job, web_search, web_fetch, computer. args is a JSON-encoded object string.",
+            json!({
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "tool": {"type": "string", "enum": ["read", "write", "edit", "glob", "grep", "bash", "job", "web_search", "web_fetch", "computer"]},
+                            "args": {"type": "string"},
+                            "deps": {"type": ["array", "null"], "items": {"type": "string"}},
+                            "on": {"type": ["string", "null"], "enum": ["success", "failure", "always", null]}
+                        },
+                        "required": ["id", "tool", "args", "deps", "on"],
+                        "additionalProperties": false
+                    }
+                },
+                "fail_fast": optional("boolean")
+            }),
         ),
     ]
 }
@@ -681,7 +823,8 @@ impl Tools {
             | Call::WebSearch(_)
             | Call::WebFetch(_)
             | Call::AskUser(_)
-            | Call::Goal(_) => {
+            | Call::Goal(_)
+            | Call::Dag(_) => {
                 bail!("This built-in tool must be handled by the session engine")
             }
         }
@@ -1307,7 +1450,7 @@ mod tests {
     }
     #[test]
     fn all_schema_properties_are_required() {
-        assert_eq!(schemas().len(), 14);
+        assert_eq!(schemas().len(), 15);
         for schema in schemas() {
             let p = &schema["parameters"];
             assert_eq!(
@@ -1408,5 +1551,33 @@ mod tests {
             serde_json::from_str::<Value>(&result).unwrap()["status"],
             "cancelled"
         );
+    }
+
+    #[test]
+    fn dag_validation_accepts_branching_and_rejects_cycles() {
+        let valid = json!({
+            "nodes": [
+                {"id": "a", "tool": "bash", "args": "{\"command\":\"echo ok\"}", "deps": null, "on": null},
+                {"id": "b", "tool": "bash", "args": "{\"command\":\"echo {{a.output}}\"}", "deps": ["a"], "on": "success"},
+                {"id": "c", "tool": "bash", "args": "{\"command\":\"echo fallback\"}", "deps": ["a"], "on": "failure"}
+            ],
+            "fail_fast": false
+        });
+        assert!(validate("dag", &valid).is_ok());
+
+        let cycle = json!({
+            "nodes": [
+                {"id": "a", "tool": "bash", "args": "{\"command\":\"echo 1\"}", "deps": ["b"], "on": "success"},
+                {"id": "b", "tool": "bash", "args": "{\"command\":\"echo 2\"}", "deps": ["a"], "on": "success"}
+            ]
+        });
+        assert!(validate("dag", &cycle).is_err());
+
+        let nested_dag = json!({
+            "nodes": [
+                {"id": "a", "tool": "dag", "args": "{}", "deps": null, "on": null}
+            ]
+        });
+        assert!(validate("dag", &nested_dag).is_err());
     }
 }

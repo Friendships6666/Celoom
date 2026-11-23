@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type FormEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowDown, ArrowUp, Check, ChevronRight, CircleAlert, CircleHelp, FolderOpen, GitBranch, Globe2, Image as ImageIcon, ImagePlus, LoaderCircle, Minimize2, Monitor, Search, Square, Target, Terminal, X, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronRight, CircleAlert, CircleHelp, FolderOpen, GitBranch, Globe2, Image as ImageIcon, ImagePlus, LoaderCircle, Minimize2, Monitor, Search, Square, Target, Terminal, Workflow, X, Zap } from 'lucide-react';
 import { api, errorMessage } from './api';
 import { assistantLabel, subagentLabel, timeline, toolSummary, type TimelineItem } from './events';
 import { LogoMark } from './Logo';
@@ -25,7 +25,7 @@ function timeLabel(time: string) { const date = new Date(time); return Number.is
 function ToolCard({ item, running }: { item: Extract<TimelineItem, { kind: 'tool' }>; running: boolean }) {
   const operation = toolSummary(item.name, item.args);
   const tool = item.name.replace(/^functions\./, '');
-  const Icon = tool === 'subagent' ? GitBranch : tool === 'computer' ? Monitor : tool === 'ask_user' ? CircleHelp : tool === 'goal' ? Target : tool === 'web_search' ? Search : tool === 'web_fetch' ? Globe2 : tool === 'read_image' ? ImageIcon : Terminal;
+  const Icon = tool === 'dag' ? Workflow : tool === 'subagent' ? GitBranch : tool === 'computer' ? Monitor : tool === 'ask_user' ? CircleHelp : tool === 'goal' ? Target : tool === 'web_search' ? Search : tool === 'web_fetch' ? Globe2 : tool === 'read_image' ? ImageIcon : Terminal;
   return <details className={`tool-card ${item.error ? 'tool-error' : ''}`}><summary><span className="tool-icon"><Icon size={16} /></span><span className="tool-summary"><strong>{item.name || '工具调用'}</strong>{operation && <code className="tool-operation" title={operation}>{operation}</code>}<small>{item.finished ? item.error ? '执行失败' : '执行完成' : running ? '正在执行' : '未确认完成'}</small></span><span className="tool-result-icon">{item.finished ? item.error ? <CircleAlert size={15} /> : <Check size={15} /> : running ? <LoaderCircle size={15} className="spin" /> : <CircleAlert size={15} />}</span><ChevronRight size={15} className="details-chevron" /></summary><div className="tool-details"><span className="section-eyebrow">输入参数</span><pre>{tool === 'computer' ? safeComputerText(typeof item.args === 'string' ? item.args : JSON.stringify(item.args, null, 2) ?? '') : typeof item.args === 'string' ? item.args : JSON.stringify(item.args, null, 2)}</pre>{item.output !== undefined && <><span className="section-eyebrow">输出</span><pre>{item.output || '（无输出）'}</pre></>}{item.finished && item.capture?.capture_id && <ComputerCapture activity={item.capture} compact />}</div></details>;
 }
 function TimelineEntry({ item, running, onOpenSession, onPreview, model, sessionId }: { item: TimelineItem; running: boolean; onOpenSession: (id: string) => void; onPreview: (images: ImageInput[], index: number) => void; model?: ModelOption; sessionId: string }) {

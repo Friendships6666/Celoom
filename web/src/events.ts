@@ -169,6 +169,11 @@ export function toolSummary(name: string, args: unknown): string {
   }
   if (tool === 'web_search') return first('query');
   if (tool === 'web_fetch') return first('url');
+  if (tool === 'dag') {
+    const nodes = Array.isArray(a.nodes) ? a.nodes : [];
+    const ids = nodes.map(n => (isRecord(n) ? str(n.id) : '')).filter(Boolean);
+    return nodes.length ? `${nodes.length} 节点流水线${ids.length ? ` · ${ids.slice(0, 4).join(' → ')}${ids.length > 4 ? '…' : ''}` : ''}` : 'DAG 分支任务图';
+  }
   if (tool === 'grep') return first('pattern', 'query');
   if (tool === 'glob') return first('pattern');
   if (tool === 'job' || tool.startsWith('job_')) return [first('action') || tool.slice(4), first('job_id', 'id')].filter(Boolean).join(' · ');

@@ -1434,6 +1434,10 @@ pub fn validate_config(c: &AppConfig) -> Result<()> {
                     m.max_output_tokens > 0 && m.max_output_tokens < m.context_window,
                     "Maximum output must be positive and below context window"
                 );
+                ensure!(
+                    (20..=100).contains(&m.auto_compact_percent),
+                    "Auto-compaction threshold must be 20–100%"
+                );
                 const EFFORTS: [&str; 7] =
                     ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
                 let unique: HashSet<_> = m.reasoning_efforts.iter().collect();

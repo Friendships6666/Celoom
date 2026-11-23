@@ -2756,31 +2756,51 @@ fn route_fingerprint(snapshot: &Snapshot) -> String {
     // Includes per-request transport identity through a private snapshot helper.
     snapshot.replay_fingerprint()
 }
+fn approx_str_tokens(s: &str) -> u64 {
+    let mut ascii = 0u64;
+    let mut non_ascii = 0u64;
+    for b in s.bytes() {
+        if b < 0x80 {
+            ascii += 1;
+        } else if (b & 0xc0) != 0x80 {
+            non_ascii += 1;
+        }
+    }
+    ascii.div_ceil(4).saturating_add(non_ascii)
+}
+
 fn within_budget(items: &[Value], snapshot: &Snapshot, compact: bool) -> Result<bool> {
-    // Conservative UTF-8 byte upper bound rather than an inaccurate tokenizer.
-    // Stored history is never truncated. Images have a separately reserved cost.
+    // Token-based estimate rather than raw byte count so large UTF-8/base64 payloads
+    // do not trigger premature compaction at ~13% of the model's token window.
     fn cost(value: &Value) -> u64 {
         if value["type"] == "input_image" {
-            return 8192;
+            return 1024;
         }
         match value {
-            Value::String(s) => s.len() as u64,
-            Value::Array(a) => a.iter().map(cost).sum::<u64>() + a.len() as u64 * 4,
-            Value::Object(o) => o.iter().map(|(k, v)| k.len() as u64 + cost(v) + 8).sum(),
-            _ => 16,
+            Value::String(s) => approx_str_tokens(s),
+            Value::Array(a) => a.iter().map(cost).sum::<u64>() + a.len() as u64 * 2,
+            Value::Object(o) => o
+                .iter()
+                .map(|(k, v)| approx_str_tokens(k) + cost(v) + 2)
+                .sum(),
+            _ => 4,
         }
     }
     let tools = if compact {
         0
     } else {
-        serde_json::to_vec(&tools::schemas())?.len() as u64
+        (serde_json::to_vec(&tools::schemas())?.len() as u64).div_ceil(4)
     };
     let estimated = cost(&Value::Array(items.to_vec()))
-        .saturating_add(network::INSTRUCTIONS.len() as u64)
+        .saturating_add(approx_str_tokens(network::INSTRUCTIONS))
         .saturating_add(tools)
-        .saturating_add(snapshot.max_output_tokens)
-        .saturating_add(2048);
-    Ok(estimated < snapshot.context_window)
+        .saturating_add(512);
+    if compact {
+        return Ok(estimated.saturating_add(snapshot.max_output_tokens) < snapshot.context_window);
+    }
+    let pct = (snapshot.auto_compact_percent as u64).clamp(20, 100);
+    let threshold = snapshot.context_window.saturating_mul(pct) / 100;
+    Ok(estimated < threshold)
 }
 fn compact_transcript(items: &[Value]) -> Result<String> {
     let mut portable = Vec::new();

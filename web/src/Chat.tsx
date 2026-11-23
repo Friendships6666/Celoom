@@ -312,10 +312,12 @@ export function Chat({ session, events, model, config, connection, error, onRelo
   const usageCached = rawCached !== null && rawCached !== undefined && Number.isFinite(Number(rawCached)) ? Number(rawCached) : null;
   const cacheHitRate = usageCached !== null && usageInput > 0 ? (usageCached / usageInput) * 100 : null;
   const contextWindow = Number(usage?.context_window) > 0 ? Number(usage?.context_window) : (model?.model.context_window ?? 0);
+  const compactThresholdPct = Math.min(100, Math.max(20, model?.model.auto_compact_percent ?? 95));
+  const compactThresholdRatio = compactThresholdPct / 100;
   const contextUsed = Number.isFinite(usageInput) && usageInput > 0 ? usageInput : 0;
   const contextRatio = contextWindow > 0 ? Math.min(1, contextUsed / contextWindow) : 0;
   const contextPct = Math.round(contextRatio * 100);
-  const contextLevel = session?.status === 'context_limit' || session?.status === 'auto_compacting' || contextRatio >= 0.88 ? 'full' : contextRatio >= 0.7 ? 'warn' : 'normal';
+  const contextLevel = session?.status === 'context_limit' || session?.status === 'auto_compacting' || contextRatio >= compactThresholdRatio ? 'full' : contextRatio >= Math.max(0.5, compactThresholdRatio - 0.12) ? 'warn' : 'normal';
   useEffect(() => { if (follow.current) bottom.current?.scrollIntoView({ behavior: 'instant', block: 'end' }); }, [events]);
   useEffect(() => { if (input.current) { input.current.style.height = 'auto'; input.current.style.height = `${Math.min(input.current.scrollHeight, 190)}px`; } }, [text]);
   async function attachImages(files: File[], fromPaste = false) {
@@ -416,7 +418,7 @@ export function Chat({ session, events, model, config, connection, error, onRelo
         </div>
         <div id="composer-delivery-hint" className="delivery-hint delivery-explanation" role="status">{escalationStatus || (pendingMessage ? '已发送消息等待交付 · Esc 强制介入，不发送草稿、不停止任务' : '新消息默认工具边界后交付 · 发送后可按 Esc 强制介入')}</div>
       </form>
-      <div className="context-meter" title={contextWindow > 0 ? `上下文占用 ${contextUsed.toLocaleString()} / ${contextWindow.toLocaleString()} (${contextPct}%)${contextLevel === 'full' ? ' · 接近上限，即将压缩上下文' : ''}` : '暂无上下文窗口数据'}>
+      <div className="context-meter" title={contextWindow > 0 ? `上下文占用 ${contextUsed.toLocaleString()} / ${contextWindow.toLocaleString()} (${contextPct}% · 自动压缩阈值 ${compactThresholdPct}%)${contextLevel === 'full' ? ' · 即将压缩上下文' : ''}` : '暂无上下文窗口数据'}>
         <div className="context-meter-track">
           <div
             className={`context-meter-fill ${contextLevel}`}
@@ -425,8 +427,8 @@ export function Chat({ session, events, model, config, connection, error, onRelo
         </div>
         <span className={`context-meter-label ${contextLevel}`}>
           {contextWindow > 0
-            ? `上下文 ${contextPct}% (${contextUsed.toLocaleString()} / ${contextWindow.toLocaleString()})${contextLevel === 'full' ? ' · 即将压缩' : ''}`
-            : '上下文 0%'}
+            ? `上下文 ${contextPct}% / ${compactThresholdPct}% (${contextUsed.toLocaleString()} / ${contextWindow.toLocaleString()})${contextLevel === 'full' ? ' · 即将压缩' : ''}`
+            : `上下文 0% / ${compactThresholdPct}%`}
         </span>
       </div>
       <div className="composer-footnote"><span>{connection === 'reconnecting' ? <><span className="connection-dot warning" />连接中断，正从最新事件重连</> : <><span className={`connection-dot ${connection === 'connected' ? '' : 'warning'}`} />{connection === 'connected' ? '已连接' : '未连接'}<span className="desktop-only"> · {running ? '断开页面不会取消任务' : 'Shift + Enter 换行'}</span></>}</span><div className="composer-footnote-actions">{usage && Number.isFinite(usageInput) && Number.isFinite(usageOutput) && <span className="usage-inline" title={`上下文窗口 ${usage.context_window} · 最大输出 ${usage.max_output_tokens}${usageCached !== null ? ` · 缓存命中 ${usageCached.toLocaleString()} / ${usageInput.toLocaleString()}${cacheHitRate !== null ? ` (${cacheHitRate.toFixed(1)}%)` : ''}` : ''}`}>输入 {usageInput.toLocaleString()} / 输出 {usageOutput.toLocaleString()}{cacheHitRate !== null && ` · 缓存 ${cacheHitRate.toFixed(1)}%`}</span>}<button type="button" className="icon-button compact-button" onClick={() => void runAction('compact')} disabled={running || sending || action !== null || !hasUserMessage} title="手动压缩上下文" aria-label="手动压缩上下文">{action === 'compact' ? <LoaderCircle size={14} className="spin" /> : <Minimize2 size={14} />}</button></div></div>

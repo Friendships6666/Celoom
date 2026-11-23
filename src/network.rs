@@ -64,6 +64,7 @@ pub struct Snapshot {
     pub model_name: String,
     pub context_window: u64,
     pub max_output_tokens: u64,
+    pub auto_compact_percent: u8,
     pub supports_images: bool,
     pub strict_tools: bool,
     pub omit_tool_strict: bool,
@@ -150,6 +151,10 @@ impl Snapshot {
             secret,
             context_window,
             max_output_tokens,
+            auto_compact_percent: model["auto_compact_percent"]
+                .as_u64()
+                .unwrap_or(95)
+                .clamp(20, 100) as u8,
             supports_images: model["supports_images"].as_bool().unwrap_or(false),
             strict_tools: model["strict_tools"].as_bool().unwrap_or(true),
             omit_tool_strict: model["omit_tool_strict"].as_bool().unwrap_or(true),
@@ -480,6 +485,7 @@ pub fn anonymous_client(network: &crate::models::NetworkConfig, url: &str) -> Re
         model_name: String::new(),
         context_window: 0,
         max_output_tokens: 0,
+        auto_compact_percent: 95,
         supports_images: false,
         strict_tools: false,
         omit_tool_strict: false,
@@ -1594,6 +1600,7 @@ mod tests {
             model_name: "mock".into(),
             context_window: 128000,
             max_output_tokens: 4096,
+            auto_compact_percent: 95,
             supports_images: false,
             strict_tools: true,
             omit_tool_strict: false,

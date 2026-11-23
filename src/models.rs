@@ -104,6 +104,10 @@ impl std::fmt::Debug for ApiKey {
     }
 }
 
+fn default_auto_compact_percent() -> u8 {
+    95
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ModelConfig {
@@ -113,6 +117,8 @@ pub struct ModelConfig {
     pub supports_images: bool,
     pub max_output_tokens: u32,
     pub context_window: u32,
+    #[serde(default = "default_auto_compact_percent")]
+    pub auto_compact_percent: u8,
     pub reasoning_efforts: Vec<String>,
     pub reasoning_effort: String,
     pub strict_tools: bool,
@@ -130,6 +136,7 @@ impl Default for ModelConfig {
             supports_images: false,
             max_output_tokens: 16384,
             context_window: 128000,
+            auto_compact_percent: 95,
             reasoning_efforts: vec!["low".into(), "medium".into(), "high".into()],
             reasoning_effort: "medium".into(),
             strict_tools: true,

@@ -1,7 +1,7 @@
 export interface Bootstrap { initialized: boolean; authenticated: boolean; allow_setup: boolean; version: string; workspace?: string; data_dir?: string }
 export interface ModelConfig {
   id: string; name: string; model: string; supports_images: boolean;
-  max_output_tokens: number; context_window: number; reasoning_efforts: string[];
+  max_output_tokens: number; context_window: number; auto_compact_percent?: number; reasoning_efforts: string[];
   reasoning_effort: string; strict_tools: boolean; omit_tool_strict?: boolean; reasoning_replay: boolean; send_store: boolean; cache_routing?: boolean;
 }
 export interface ApiKey { id: string; name: string; secret?: string; has_secret?: boolean; models: ModelConfig[] }

@@ -304,9 +304,9 @@ pub fn validate(name: &str, args: &Value) -> Result<Call> {
                     || a.objective
                         .as_ref()
                         .is_none_or(|t| t.trim().is_empty() || t.len() > 16000)
-                    || a.progress.is_some()
+                    || a.progress.as_ref().is_some_and(|p| p.len() > 8000)
                 {
-                    bail!("goal create requires title/objective and id/progress null");
+                    bail!("goal create requires title/objective and id null");
                 }
             }
             "update" | "complete" => {
@@ -444,6 +444,14 @@ pub fn validate(name: &str, args: &Value) -> Result<Call> {
                         .is_some_and(|t| !t.trim().is_empty() && t.len() <= 128 * 1024)
                         && a.id.is_none()
                         && a.wait_ms.is_none() => {}
+                "clone"
+                    if a.id
+                        .as_ref()
+                        .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok())
+                        && a.wait_ms.is_none()
+                        && a.task
+                            .as_ref()
+                            .is_none_or(|t| !t.trim().is_empty() && t.len() <= 128 * 1024) => {}
                 "wait" | "cancel"
                     if a.id
                         .as_ref()
@@ -495,8 +503,8 @@ pub fn schemas() -> Vec<Value> {
     vec![
         function(
             "computer",
-            "Control UI with highest available privileges. Prefer browser DOM refs (isolated AI browser), then desktop accessibility refs (isolated KDE Wayland), only target=host for necessary shared-desktop fallback. Observe before actions; refs expire. screenshot returns real vision input. Host uses a short lease and physical human input cancels it. status starts no apps; stop releases your resources. Never blindly repeat an unknown side effect.",
-            json!({"action":{"type":"string","enum":["status","open","observe","click","fill","type","key","scroll","screenshot","launch","stop"]},"target":optional("string"),"ref_id":optional("string"),"url":optional("string"),"text":optional("string"),"x":optional("integer"),"y":optional("integer"),"key":optional("string"),"button":optional("string"),"delta":optional("integer"),"argv":{"type":["array","null"],"items":{"type":"string"}}}),
+            "Control UI with highest available privileges. Prefer browser DOM refs (persistent AI browser with saved login/cookies), then desktop accessibility refs (isolated KDE Wayland), only target=host for shared-desktop fallback. Browser also supports back, wait (ms in delta or selector in text), hover, eval (JS expression in text), cookies, handoff (pop up visible browser for user CAPTCHA/login; pair with ask_user blocking=true), resume_headless (close popup & resume). Observe before actions; refs expire.",
+            json!({"action":{"type":"string","enum":["status","open","observe","click","fill","type","key","scroll","hover","back","wait","eval","cookies","handoff","resume_headless","screenshot","launch","stop"]},"target":optional("string"),"ref_id":optional("string"),"url":optional("string"),"text":optional("string"),"x":optional("integer"),"y":optional("integer"),"key":optional("string"),"button":optional("string"),"delta":optional("integer"),"argv":{"type":["array","null"],"items":{"type":"string"}}}),
         ),
         function(
             "ask_user",
@@ -505,12 +513,12 @@ pub fn schemas() -> Vec<Value> {
         ),
         function(
             "goal",
-            "Manage persistent long tasks. create adds a pending goal for user activation; list inspects. update records progress of an ACTIVE goal; complete marks it done only after verified completion and concrete evidence in progress. An active goal drives continued execution until completed or user pauses/stops.",
+            "Persistent long-task tracker. Use create for multi-step/long tasks (auto-starts as active when idle), list to inspect, update to save progress, complete only with verified evidence. Active goals auto-continue until completed/paused.",
             json!({"action":{"type":"string","enum":["list","create","update","complete"]},"id":optional("string"),"title":optional("string"),"objective":optional("string"),"progress":optional("string")}),
         ),
         function(
             "web_search",
-            "Search the web using built-in public free search engines and configured providers. Supports depth='standard' (default) or depth='deep' (parallel multi-engine aggregation across DuckDuckGo, Bing, Wikipedia, GitHub, arXiv, HackerNews, StackOverflow + automatic readable excerpts from top pages). Optional engine overrides the configured provider ('auto', 'duckduckgo', 'bing', 'wikipedia', 'github', 'arxiv', 'hackernews', 'stackexchange', 'searxng', 'brave'). max_results default 5 (or 8 in deep mode), <=20.",
+            "Search the web using built-in public free search engines and configured providers. Supports depth='standard' (default) or depth='deep' (parallel multi-engine aggregation across Bing, Wikipedia, GitHub, HackerNews + automatic readable excerpts from top pages). Optional engine overrides the configured provider ('auto', 'bing', 'wikipedia', 'github', 'arxiv', 'hackernews', 'stackexchange', 'searxng', 'brave'). max_results default 5 (or 8 in deep mode), <=20.",
             json!({"query":{"type":"string"},"max_results":optional("integer"),"depth":optional("string"),"engine":optional("string")}),
         ),
         function(
@@ -560,8 +568,8 @@ pub fn schemas() -> Vec<Value> {
         ),
         function(
             "subagent",
-            "models lists the user's allowed subagent model choices (other fields null). spawn requires task; optional model_id selects a MODEL-POOL CHOICE ID, not the vendor model name; omitted/null/inherit uses parent model and effort. Fork closed parent context, max4 children/depth1. wait/cancel require child id, task/model_id null and wait_ms<=60000. Results include actual model provenance.",
-            json!({"action":{"type":"string","enum":["models","spawn","wait","cancel"]},"task":optional("string"),"id":optional("string"),"wait_ms":optional("integer"),"model_id":optional("string")}),
+            "models lists the user's allowed subagent model choices (other fields null). spawn requires task; clone clones an existing child subagent by id with optional new task and model_id; omitted/null/inherit uses parent/source model. Max 4 children/depth 1. wait/cancel require child id, task/model_id null and wait_ms<=60000.",
+            json!({"action":{"type":"string","enum":["models","spawn","clone","wait","cancel"]},"task":optional("string"),"id":optional("string"),"wait_ms":optional("integer"),"model_id":optional("string")}),
         ),
     ]
 }
@@ -596,6 +604,29 @@ impl Tools {
             jobs: Arc::new(Mutex::new(HashMap::new())),
             file_locks: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+    pub async fn list_jobs(&self) -> Vec<Value> {
+        let jobs: Vec<(String, Arc<Job>)> = self
+            .jobs
+            .lock()
+            .await
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        let mut out = Vec::with_capacity(jobs.len());
+        for (id, job) in jobs {
+            let st = job.state.lock().await;
+            out.push(json!({
+                "id": id,
+                "owner": job.owner,
+                "status": st.status,
+                "running": st.status == "running",
+                "exit_code": st.exit_code,
+                "bytes": st.bytes,
+                "privilege": job.privilege,
+            }));
+        }
+        out
     }
     pub async fn cancel_session(&self, id: &str) {
         let jobs = self.jobs.lock().await;
@@ -675,19 +706,6 @@ impl Tools {
             bail!("Bash cwd must be a directory");
         }
         let mut jobs = self.jobs.lock().await;
-        let mut running = 0;
-        let mut owned = 0;
-        for job in jobs.values() {
-            if job.state.lock().await.status == "running" {
-                running += 1;
-                if job.owner == owner {
-                    owned += 1;
-                }
-            }
-        }
-        if running >= 64 || owned >= 16 {
-            bail!("Too many running jobs; poll or cancel existing jobs");
-        }
         let id = uuid::Uuid::new_v4().to_string();
         let log_dir = self.data_dir.join("jobs").join(&id);
         tokio::fs::create_dir_all(&log_dir)
@@ -962,7 +980,7 @@ fn edit_file(path: &Path, args: &EditArgs) -> Result<String> {
 fn atomic_write(path: &Path, content: &[u8], before: Option<&[u8]>) -> Result<()> {
     use std::io::Write;
     let parent = path.parent().context("Missing parent")?;
-    let temporary = parent.join(format!(".justai-{}.tmp", uuid::Uuid::new_v4()));
+    let temporary = parent.join(format!(".celoom-{}.tmp", uuid::Uuid::new_v4()));
     let result = (|| -> Result<()> {
         let mut file = std::fs::OpenOptions::new()
             .create_new(true)
@@ -1001,7 +1019,7 @@ fn atomic_write(path: &Path, content: &[u8], before: Option<&[u8]>) -> Result<()
         && temporary.parent() == Some(parent)
         && temporary
             .file_name()
-            .is_some_and(|s| s.to_string_lossy().starts_with(".justai-"))
+            .is_some_and(|s| s.to_string_lossy().starts_with(".celoom-"))
     {
         let _ = std::fs::remove_file(&temporary);
     }

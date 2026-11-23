@@ -282,6 +282,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "celoom"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "argon2",
+ "aws-lc-rs",
+ "axum",
+ "base64 0.22.1",
+ "chrono",
+ "eventsource-stream",
+ "futures-util",
+ "globset",
+ "hmac",
+ "http-body-util",
+ "image",
+ "mime_guess",
+ "nix",
+ "notify",
+ "rand 0.8.8",
+ "regex",
+ "reqwest",
+ "rusqlite",
+ "rust-embed",
+ "scraper",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "tokio-util",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols-plasma",
+ "wayland-scanner",
+ "zbus",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1288,52 +1334,6 @@ dependencies = [
  "cfg-if",
  "futures-util",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "justaiagent"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "argon2",
- "aws-lc-rs",
- "axum",
- "base64 0.22.1",
- "chrono",
- "eventsource-stream",
- "futures-util",
- "globset",
- "hmac",
- "http-body-util",
- "image",
- "mime_guess",
- "nix",
- "notify",
- "rand 0.8.8",
- "regex",
- "reqwest",
- "rusqlite",
- "rust-embed",
- "scraper",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite",
- "tokio-util",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols-plasma",
- "wayland-scanner",
- "zbus",
 ]
 
 [[package]]

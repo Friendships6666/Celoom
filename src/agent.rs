@@ -27,6 +27,7 @@ struct Inner {
     tools: Tools,
     active: Mutex<HashMap<String, Active>>,
     children: Mutex<HashMap<String, Arc<Child>>>,
+    last_cancelled_children: Mutex<HashMap<String, Vec<String>>>,
     child_permits: Arc<Semaphore>,
     wake: Notify,
     audit: tokio::sync::OnceCell<crate::cache_audit::CacheAudit>,
@@ -60,6 +61,7 @@ impl Engine {
                 tools: Tools::new(data_dir),
                 active: Mutex::new(HashMap::new()),
                 children: Mutex::new(HashMap::new()),
+                last_cancelled_children: Mutex::new(HashMap::new()),
                 child_permits: Arc::new(Semaphore::new(4)),
                 wake: Notify::new(),
                 audit: tokio::sync::OnceCell::new(),
@@ -81,6 +83,240 @@ impl Engine {
     }
     pub fn computer(&self) -> crate::computer::Computer {
         self.inner.computer.clone()
+    }
+    pub async fn runtime_overview(&self, session_id: Option<&str>) -> Result<Value> {
+        let comp = self.inner.computer.status().await;
+        let browser_running = comp["browser"]["running"].as_bool() == Some(true)
+            || comp["browser"]["status"].as_str() == Some("running");
+        let desktop_running = comp["desktop"]["running"].as_bool() == Some(true)
+            || comp["desktop"]["status"].as_str() == Some("running");
+        let host_running = comp["host"]["active"].as_bool() == Some(true)
+            || comp["host"]["leased"].as_bool() == Some(true);
+
+        let services = vec![
+            json!({
+                "id": "service:celoom",
+                "name": "Celoom 主服务",
+                "running": true,
+                "status": "running",
+                "detail": format!("PID {}", std::process::id()),
+            }),
+            json!({
+                "id": "service:browser",
+                "name": "AI 浏览器服务",
+                "running": browser_running,
+                "status": if browser_running { "running" } else { "ended" },
+                "detail": comp["browser"]["status"].as_str().unwrap_or("stopped"),
+            }),
+            json!({
+                "id": "service:desktop",
+                "name": "KDE Wayland 桌面服务",
+                "running": desktop_running,
+                "status": if desktop_running { "running" } else { "ended" },
+                "detail": comp["desktop"]["status"].as_str().unwrap_or("stopped"),
+            }),
+            json!({
+                "id": "service:host",
+                "name": "宿主桌面接管",
+                "running": host_running,
+                "status": if host_running { "running" } else { "ended" },
+                "detail": if host_running { "leased" } else { "idle" },
+            }),
+        ];
+
+        let active_ids: std::collections::HashSet<String> = {
+            self.inner.active.lock().await.keys().cloned().collect()
+        };
+
+        let jobs = self.inner.tools.list_jobs().await;
+        let sessions = self.inner.store.sessions().await.unwrap_or_default();
+
+        let mut processes = Vec::new();
+        for s in &sessions {
+            if s.parent_id.is_none() {
+                let is_run = active_ids.contains(&s.id)
+                    || matches!(
+                        s.status.as_str(),
+                        "running" | "waiting_for_network" | "waiting_for_answer" | "queued"
+                    );
+                if is_run || session_id == Some(s.id.as_str()) {
+                    processes.push(json!({
+                        "id": format!("runner:{}", s.id),
+                        "name": s.title,
+                        "running": is_run,
+                        "status": s.status,
+                        "detail": if is_run { "会话运行器" } else { "会话已结束" },
+                        "is_current": session_id == Some(s.id.as_str()),
+                    }));
+                }
+            }
+        }
+
+        let mut session_tasks = Vec::new();
+        if let Some(sid) = session_id {
+            if let Ok(goals) = self.inner.store.goals(sid).await {
+                for g in goals {
+                    let is_run = g.status == "active";
+                    session_tasks.push(json!({
+                        "id": format!("goal:{}", g.id),
+                        "name": g.title,
+                        "running": is_run,
+                        "status": g.status,
+                        "detail": format!("{} · 第 {} 轮", g.status, g.rounds),
+                    }));
+                }
+            }
+            for j in &jobs {
+                if j["owner"].as_str() == Some(sid) {
+                    session_tasks.push(json!({
+                        "id": format!("session-job:{}", j["id"].as_str().unwrap_or("")),
+                        "name": format!("Bash 后台任务 ({})", j["privilege"].as_str().unwrap_or("user")),
+                        "running": j["running"].as_bool() == Some(true),
+                        "status": j["status"].as_str().unwrap_or("ended"),
+                        "detail": format!("{} bytes", j["bytes"].as_u64().unwrap_or(0)),
+                    }));
+                }
+            }
+        }
+
+        let mut subagents = Vec::new();
+        for s in &sessions {
+            if let Some(pid) = &s.parent_id {
+                let is_run = active_ids.contains(&s.id)
+                    || matches!(
+                        s.status.as_str(),
+                        "running" | "waiting_for_network" | "waiting_for_answer" | "queued"
+                    );
+                subagents.push(json!({
+                    "id": s.id,
+                    "parent_id": pid,
+                    "is_current_session": session_id == Some(pid.as_str()),
+                    "name": s.title,
+                    "running": is_run,
+                    "status": s.status,
+                    "detail": if s.selection.model_id.is_empty() { "继承主模型" } else { s.selection.model_id.as_str() },
+                }));
+            }
+        }
+
+        let last_cancelled_subagents: Vec<String> = {
+            let map = self.inner.last_cancelled_children.lock().await;
+            session_id
+                .and_then(|sid| map.get(sid).cloned())
+                .or_else(|| map.get("__global__").cloned())
+                .unwrap_or_default()
+        };
+
+        Ok(json!({
+            "services": services,
+            "processes": processes,
+            "jobs": jobs,
+            "session_tasks": session_tasks,
+            "subagents": subagents,
+            "last_cancelled_subagents": last_cancelled_subagents,
+        }))
+    }
+    pub async fn resume_subagent(&self, child_id: &str) -> Result<String> {
+        let child = self.inner.store.session(child_id).await?;
+        anyhow::ensure!(child.parent_id.is_some(), "Session is not a subagent");
+        let mut active = self.inner.active.lock().await;
+        if let Some(runner) = active.get(child_id)
+            && !runner.cancel.is_cancelled()
+        {
+            return Ok(runner.run_id.clone());
+        }
+        let run_id = new_id();
+        let cancel = CancellationToken::new();
+        active.insert(
+            child_id.to_owned(),
+            Active {
+                run_id: run_id.clone(),
+                cancel: cancel.clone(),
+                interrupt: CancellationToken::new(),
+            },
+        );
+        drop(active);
+        let msg = "Continue your previously cancelled/interrupted subagent task from where you left off. Do not repeat already completed steps; summarize final results and evidence when done.";
+        self.inner
+            .store
+            .accept_message(
+                child_id,
+                &new_id(),
+                vec![json!({"role":"user","content":[{"type":"input_text","text":msg}]})],
+                json!({"id":new_id(),"text":msg}),
+            )
+            .await?;
+        self.inner.store.set_status(child_id, "running").await?;
+        self.inner
+            .files
+            .begin_turn(&child.id, &child.cwd, &run_id)
+            .await;
+        self.launch(child, run_id.clone(), cancel, false, None);
+        Ok(run_id)
+    }
+    pub async fn cancel_subagent(&self, child_id: &str) -> Result<()> {
+        let child = self.inner.store.session(child_id).await?;
+        anyhow::ensure!(child.parent_id.is_some(), "Session is not a subagent");
+        if let Some(c) = self.inner.children.lock().await.get(child_id).cloned() {
+            c.cancel.cancel();
+        }
+        if let Some(active) = self.inner.active.lock().await.get(child_id) {
+            active.cancel.cancel();
+        }
+        self.inner.tools.cancel_session(child_id).await;
+        let _ = self.inner.store.set_status(child_id, "cancelled").await;
+        let mut map = self.inner.last_cancelled_children.lock().await;
+        if let Some(pid) = &child.parent_id {
+            map.insert(pid.clone(), vec![child_id.to_owned()]);
+        }
+        map.insert("__global__".into(), vec![child_id.to_owned()]);
+        Ok(())
+    }
+    pub async fn cancel_all_subagents(&self) -> Result<usize> {
+        let sessions = self.inner.store.sessions().await.unwrap_or_default();
+        let active_ids: std::collections::HashSet<String> = {
+            self.inner.active.lock().await.keys().cloned().collect()
+        };
+        let mut cancelled_ids = Vec::new();
+        for s in sessions {
+            if s.parent_id.is_some()
+                && (active_ids.contains(&s.id)
+                    || matches!(
+                        s.status.as_str(),
+                        "running" | "waiting_for_network" | "waiting_for_answer" | "queued"
+                    ))
+            {
+                let _ = self.cancel_subagent(&s.id).await;
+                cancelled_ids.push(s.id);
+            }
+        }
+        if !cancelled_ids.is_empty() {
+            self.inner
+                .last_cancelled_children
+                .lock()
+                .await
+                .insert("__global__".into(), cancelled_ids.clone());
+        }
+        Ok(cancelled_ids.len())
+    }
+    pub async fn resume_last_cancelled_subagents(
+        &self,
+        parent_id: Option<&str>,
+    ) -> Result<Vec<String>> {
+        let ids: Vec<String> = {
+            let map = self.inner.last_cancelled_children.lock().await;
+            parent_id
+                .and_then(|pid| map.get(pid).cloned())
+                .or_else(|| map.get("__global__").cloned())
+                .unwrap_or_default()
+        };
+        let mut resumed = Vec::new();
+        for id in ids {
+            if self.resume_subagent(&id).await.is_ok() {
+                resumed.push(id);
+            }
+        }
+        Ok(resumed)
     }
     pub async fn emergency_computer_stop(&self) -> Result<()> {
         let status = self.inner.computer.status().await;
@@ -241,7 +477,7 @@ impl Engine {
         self.cancel_execution(id).await
     }
     async fn cancel_execution(&self, id: &str) -> Result<()> {
-        self.inner.store.session(id).await?;
+        let session = self.inner.store.session(id).await?;
         if let Some(active) = self.inner.active.lock().await.get(id) {
             active.cancel.cancel();
         }
@@ -256,9 +492,23 @@ impl Engine {
             .filter(|(_, c)| c.parent == id)
             .map(|(id, c)| (id.clone(), c.clone()))
             .collect();
+        let mut cancelled_children = Vec::new();
         for (child_id, child) in children {
             child.cancel.cancel();
             self.inner.tools.cancel_session(&child_id).await;
+            let _ = self.inner.store.set_status(&child_id, "cancelled").await;
+            cancelled_children.push(child_id);
+        }
+        if !cancelled_children.is_empty() {
+            let mut map = self.inner.last_cancelled_children.lock().await;
+            map.insert(id.to_owned(), cancelled_children.clone());
+            map.insert("__global__".into(), cancelled_children);
+        }
+        if matches!(
+            session.status.as_str(),
+            "running" | "compacting" | "auto_compacting" | "waiting_for_answer" | "waiting_for_network"
+        ) {
+            self.inner.store.set_status(id, "cancelled").await?;
         }
         Ok(())
     }
@@ -290,27 +540,59 @@ impl Engine {
     async fn goal_tool(&self, id: &str, args: tools::GoalArgs) -> Result<String> {
         let value = match args.action.as_str() {
             "list" => serde_json::to_value(self.inner.store.goals(id).await?)?,
-            "create" => serde_json::to_value(
-                self.inner
+            "create" => {
+                let mut goal = self
+                    .inner
                     .store
                     .create_goal(
                         id,
                         args.title.context("Goal title required")?,
                         args.objective.context("Goal objective required")?,
                     )
-                    .await?,
-            )?,
-            "update" | "complete" => serde_json::to_value(
-                self.inner
-                    .store
-                    .update_goal_progress(
-                        id,
-                        &args.id.context("Goal ID required")?,
-                        args.progress.context("Goal progress/evidence required")?,
-                        args.action == "complete",
-                    )
-                    .await?,
-            )?,
+                    .await?;
+                if self.inner.store.active_goal(id).await?.is_none() {
+                    goal = self
+                        .inner
+                        .store
+                        .change_goal(id, &goal.id, "start", None, None)
+                        .await?;
+                    if let Some(progress) = args.progress.filter(|p| !p.trim().is_empty()) {
+                        goal = self
+                            .inner
+                            .store
+                            .update_goal_progress(id, &goal.id, progress, false)
+                            .await?;
+                    }
+                }
+                serde_json::to_value(goal)?
+            }
+            "update" | "complete" => {
+                let goal_id = args.id.context("Goal ID required")?;
+                let goals = self.inner.store.goals(id).await?;
+                if goals
+                    .iter()
+                    .find(|g| g.id == goal_id)
+                    .is_some_and(|g| g.status == "pending")
+                    && self.inner.store.active_goal(id).await?.is_none()
+                {
+                    let _ = self
+                        .inner
+                        .store
+                        .change_goal(id, &goal_id, "start", None, None)
+                        .await?;
+                }
+                serde_json::to_value(
+                    self.inner
+                        .store
+                        .update_goal_progress(
+                            id,
+                            &goal_id,
+                            args.progress.context("Goal progress/evidence required")?,
+                            args.action == "complete",
+                        )
+                        .await?,
+                )?
+            }
             _ => bail!("Invalid goal action"),
         };
         Ok(value.to_string())
@@ -902,7 +1184,10 @@ impl Engine {
                         attempt = 0;
                         continue;
                     }
-                    if !error.retryable
+                    let transient_model_stream = (message.contains("Invalid function argument JSON")
+                        || message.contains("Stream done item is incomplete"))
+                        && attempt < 3;
+                    if (!error.retryable && !transient_model_stream)
                         || attempt >= snapshot.max_attempts()
                         || cancel.is_cancelled()
                     {
@@ -941,6 +1226,9 @@ impl Engine {
             self.inner.store.drain_inbox(&session.id).await?;
             let admitted = self.admit_messages(&session.id).await?;
             if admitted > 0 {
+                if cancel.is_cancelled() {
+                    bail!("Cancelled");
+                }
                 self.inner.store.set_status(&session.id, "running").await?;
             }
             self.admit_subagent_catalog(session).await?;
@@ -976,6 +1264,9 @@ impl Engine {
                     .await?;
                 let before = serde_json::to_vec(&boundary)?.len();
                 self.compact_run(session, cancel.clone()).await?;
+                if cancel.is_cancelled() {
+                    bail!("Cancelled");
+                }
                 self.inner.store.set_status(&session.id, "running").await?;
                 let after = self.inner.store.context(&session.id).await?;
                 if serde_json::to_vec(&after)?.len() >= before
@@ -988,6 +1279,9 @@ impl Engine {
                 continue;
             }
             if session.status == "waiting_for_network" {
+                if cancel.is_cancelled() {
+                    bail!("Cancelled");
+                }
                 self.inner.store.set_status(&session.id, "running").await?;
             }
             let (generated, attempt_id, request_snapshot) = match self
@@ -1111,6 +1405,201 @@ impl Engine {
                 return Ok(generated.text);
             }
             let mut fatal: Option<anyhow::Error> = None;
+            let can_parallel = calls.len() > 1
+                && !calls
+                    .iter()
+                    .any(|(_, name, _, _)| matches!(name.as_str(), "ask_user" | "goal" | "computer"));
+            if can_parallel {
+                self.wait_for_answers(&session.id, cancel.clone()).await?;
+                if self.immediate_requested(&session.id).await {
+                    for (call_id, name, args, _) in calls {
+                        self.inner
+                            .store
+                            .tool_started(&session.id, &call_id, &name, &args)
+                            .await?;
+                        self.inner
+                            .store
+                            .tool_finished(
+                                &session.id,
+                                &call_id,
+                                &name,
+                                "NOT EXECUTED: A new immediate user message superseded this unstarted tool call. Re-evaluate using the latest user instruction before any further action.",
+                                true,
+                            )
+                            .await?;
+                    }
+                    continue;
+                }
+                let mut prepared = Vec::with_capacity(calls.len());
+                for (call_id, name, args, validated) in calls {
+                    let started = self
+                        .inner
+                        .store
+                        .tool_started(&session.id, &call_id, &name, &args)
+                        .await?;
+                    if !started {
+                        match self.inner.store.tool_result(&session.id, &call_id).await? {
+                            Some((status, _)) if status == "succeeded" || status == "failed" => {}
+                            _ => {
+                                fatal = Some(anyhow!(
+                                    "Tool outcome is unknown; refusing to repeat an existing invocation"
+                                ));
+                            }
+                        }
+                        continue;
+                    }
+                    let activity = if validated.is_ok()
+                        && matches!(name.as_str(), "write" | "edit")
+                        && !cancel.is_cancelled()
+                    {
+                        file_activity_path(&session.cwd, &args).await
+                    } else {
+                        None
+                    };
+                    if let Some((path, is_new)) = &activity {
+                        self.inner
+                            .store
+                            .append_event(
+                                &session.id,
+                                "file_activity",
+                                json!({"path":path,"status":"editing","is_new":is_new}),
+                            )
+                            .await?;
+                    }
+                    prepared.push((call_id, name, validated, activity));
+                }
+                if fatal.is_none() {
+                    let boundary_ref = &boundary;
+                    let snapshot_ref = &request_snapshot;
+                    let futs = prepared.into_iter().map(|(call_id, name, validated, activity)| {
+                        let engine = self.clone();
+                        let session_clone = session.clone();
+                        let cancel_clone = cancel.clone();
+                        let boundary_clone = boundary_ref.clone();
+                        let snapshot_clone = snapshot_ref.clone();
+                        async move {
+                            let mut additional_context = Vec::new();
+                            let result = if cancel_clone.is_cancelled() {
+                                Err(anyhow!(
+                                    "Tool not executed: runner cancelled or stopped before dispatch"
+                                ))
+                            } else {
+                                match validated {
+                                    Err(error) => Err(anyhow!("Invalid tool arguments: {error}")),
+                                    Ok(Call::Subagent(args)) => {
+                                        engine
+                                            .subagent(
+                                                &session_clone,
+                                                args,
+                                                boundary_clone,
+                                                &snapshot_clone,
+                                                cancel_clone,
+                                            )
+                                            .await
+                                    }
+                                    Ok(Call::ReadImage(args)) => {
+                                        if !snapshot_clone.supports_images {
+                                            Err(anyhow!(
+                                                "The selected model is text-only. Choose an image-capable model before using read_image."
+                                            ))
+                                        } else {
+                                            match crate::image_tool::read(
+                                                Path::new(&session_clone.cwd),
+                                                &args.path,
+                                            )
+                                            .await
+                                            {
+                                                Ok(image) => {
+                                                    additional_context = image.context;
+                                                    Ok(image.summary)
+                                                }
+                                                Err(error) => Err(error),
+                                            }
+                                        }
+                                    }
+                                    Ok(Call::WebSearch(args)) => {
+                                        match engine.inner.store.config().await {
+                                            Ok(config) => {
+                                                crate::web_tools::search(
+                                                    args,
+                                                    config.search,
+                                                    config.network,
+                                                    cancel_clone,
+                                                )
+                                                .await
+                                            }
+                                            Err(err) => Err(err),
+                                        }
+                                    }
+                                    Ok(Call::WebFetch(args)) => {
+                                        match engine.inner.store.config().await {
+                                            Ok(config) => {
+                                                crate::web_tools::fetch(
+                                                    args,
+                                                    config.network,
+                                                    cancel_clone,
+                                                )
+                                                .await
+                                            }
+                                            Err(err) => Err(err),
+                                        }
+                                    }
+                                    Ok(call) => {
+                                        engine
+                                            .inner
+                                            .tools
+                                            .execute(
+                                                &session_clone.id,
+                                                Path::new(&session_clone.cwd),
+                                                call,
+                                                cancel_clone,
+                                            )
+                                            .await
+                                    }
+                                }
+                            };
+                            (call_id, name, activity, result, additional_context)
+                        }
+                    });
+                    let outcomes = futures_util::future::join_all(futs).await;
+                    for (call_id, name, activity, result, additional_context) in outcomes {
+                        let is_error = result.is_err();
+                        let output = match result {
+                            Ok(text) => text,
+                            Err(error) => self.safe_error(&error.to_string()).await,
+                        };
+                        let output = tools::bounded(&request_snapshot.redact(&output), OUTPUT_LIMIT);
+                        self.inner
+                            .store
+                            .tool_finished_with_context(
+                                &session.id,
+                                &call_id,
+                                &name,
+                                &output,
+                                is_error,
+                                additional_context,
+                            )
+                            .await?;
+                        if let Some((path, is_new)) = activity {
+                            self.inner
+                                .store
+                                .append_event(
+                                    &session.id,
+                                    "file_activity",
+                                    json!({"path":path,"status":if is_error{"failed"}else{"edited"},"is_new":is_new}),
+                                )
+                                .await?;
+                        }
+                    }
+                }
+                if let Some(error) = fatal {
+                    return Err(error);
+                }
+                if cancel.is_cancelled() {
+                    bail!("Cancelled");
+                }
+                continue;
+            }
             for (call_id, name, args, validated) in calls {
                 if self.immediate_requested(&session.id).await {
                     self.inner
@@ -1426,6 +1915,154 @@ impl Engine {
             "models" => Ok(serde_json::to_string(&crate::subagent_models::catalog(
                 &self.inner.store.config().await?,
             )?)?),
+            "clone" => {
+                if parent.depth != 0 {
+                    bail!("Subagents cannot clone other subagents");
+                }
+                let source_id = args.id.context("clone requires source subagent id")?;
+                let source = self.inner.store.session(&source_id).await?;
+                anyhow::ensure!(
+                    source.parent_id.as_deref() == Some(&parent.id),
+                    "Source subagent does not belong to this session"
+                );
+                let permit = self
+                    .inner
+                    .child_permits
+                    .clone()
+                    .try_acquire_owned()
+                    .map_err(|_| {
+                        anyhow!("Four subagents are already running; wait or cancel one")
+                    })?;
+                if cancel.is_cancelled() {
+                    bail!("Cancelled");
+                }
+                let config = self.inner.store.config().await?;
+                let (selection, effort, pool_id) = if args.model_id.is_some() {
+                    crate::subagent_models::resolve(&config, parent, args.model_id.as_deref())?
+                } else {
+                    (
+                        source.selection.clone(),
+                        source.reasoning_effort.clone(),
+                        None,
+                    )
+                };
+                let mut child_binding = source.clone();
+                child_binding.selection = selection.clone();
+                child_binding.reasoning_effort = effort.clone();
+                let child_snapshot = Snapshot::for_session(&config, &child_binding)?;
+                let raw_context = self.inner.store.context(&source.id).await?;
+                let mut child_context = portable_context(&raw_context, child_snapshot.supports_images);
+                while !child_context.is_empty() && completed_boundary(&child_context).is_err() {
+                    child_context.pop();
+                }
+                let mut provenance = child_snapshot.source_metadata("");
+                if let Some(object) = provenance.as_object_mut() {
+                    object.remove("attempt_id");
+                    object.insert("model_id".into(), json!(pool_id));
+                    object.insert("cloned_from".into(), json!(source_id));
+                }
+                let task = args
+                    .task
+                    .unwrap_or_else(|| format!("Continue/diverge from cloned subagent {source_id}"));
+                let session = self
+                    .inner
+                    .store
+                    .create_session(
+                        tools::bounded(&task, 100),
+                        source.cwd.clone(),
+                        selection.clone(),
+                        Some(parent.id.clone()),
+                        1,
+                    )
+                    .await?;
+                self.inner
+                    .store
+                    .append_context(&session.id, child_context)
+                    .await?;
+                let session = if effort.is_some() {
+                    self.inner
+                        .store
+                        .update_session_settings(&session.id, selection, effort)
+                        .await?
+                } else {
+                    session
+                };
+                self.inner.store.append_event(&session.id, "context_rebased", json!({"reason":"fork_subagent","cloned_from":source_id,"route_fingerprint":child_snapshot.replay_fingerprint()})).await?;
+                let message = format!(
+                    "Cloned subagent task (forked from subagent {source_id}):\n{task}\n\nComplete this assignment directly and independently. Do not call subagent spawn/fork/clone: children cannot create further children."
+                );
+                self.inner
+                    .store
+                    .accept_message(
+                        &session.id,
+                        &new_id(),
+                        vec![
+                            json!({"role":"user","content":[{"type":"input_text","text":message}]}),
+                        ],
+                        json!({"id":new_id(),"text":message}),
+                    )
+                    .await?;
+                let token = cancel.child_token();
+                let run_id = new_id();
+                let child = Arc::new(Child {
+                    parent: parent.id.clone(),
+                    task: task.clone(),
+                    provenance: provenance.clone(),
+                    cancel: token.clone(),
+                    result: Mutex::new(ChildResult {
+                        status: "running".into(),
+                        summary: None,
+                        delivered: false,
+                    }),
+                    notify: Notify::new(),
+                });
+                self.inner.store.set_status(&session.id, "running").await?;
+                let mut event = provenance.clone();
+                if let Some(fields) = event.as_object_mut() {
+                    fields.insert("id".into(), json!(session.id));
+                    fields.insert("task".into(), json!(tools::bounded(&task, 2000)));
+                    fields.insert("status".into(), json!("running"));
+                    fields.insert("cloned_from".into(), json!(source_id));
+                }
+                let _ = self
+                    .inner
+                    .store
+                    .append_event(&parent.id, "subagent", event)
+                    .await;
+                self.inner
+                    .children
+                    .lock()
+                    .await
+                    .insert(session.id.clone(), child);
+                self.inner.active.lock().await.insert(
+                    session.id.clone(),
+                    Active {
+                        run_id: run_id.clone(),
+                        cancel: token.clone(),
+                        interrupt: CancellationToken::new(),
+                    },
+                );
+                let id = session.id.clone();
+                if let Err(error) = self
+                    .inner
+                    .files
+                    .begin_turn(&session.id, &session.cwd, &run_id)
+                    .await
+                {
+                    let _ = self.inner.store.set_status(&id, "failed").await;
+                    self.inner.active.lock().await.remove(&id);
+                    self.inner.children.lock().await.remove(&id);
+                    return Err(error);
+                }
+                self.launch(session, run_id, token, false, Some(permit));
+                Ok(json!({
+                    "id": id,
+                    "cloned_from": source_id,
+                    "status": "running",
+                    "source": provenance,
+                })
+                .to_string())
+            }
             "spawn" => {
                 if parent.depth != 0 {
                     bail!("Subagents cannot spawn other subagents");
@@ -1623,7 +2260,7 @@ impl Engine {
         let mut snapshot = Snapshot::for_session(&self.inner.store.config().await?, &current)?;
         snapshot.max_output_tokens = snapshot
             .max_output_tokens
-            .min(4096)
+            .min(16384)
             .min(snapshot.context_window / 8)
             .max(1);
         let available = snapshot

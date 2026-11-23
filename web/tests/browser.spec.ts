@@ -84,7 +84,7 @@ test.beforeEach(async ({ page }) => {
 test('first setup validates confirmation and uses guarded same-origin mutation', async ({ page }) => {
   await bootstrap(page, false, false);
   let submitted = false;
-  await page.route('**/api/setup', async route => { expect(route.request().headers()['x-justai-request']).toBe('1'); submitted = true; await bootstrap(page, true); await route.fulfill({ json: { ok: true } }); });
+  await page.route('**/api/setup', async route => { expect(route.request().headers()['x-celoom-request']).toBe('1'); submitted = true; await bootstrap(page, true); await route.fulfill({ json: { ok: true } }); });
   await page.route('**/api/config', route => route.fulfill({ json: fixtureConfig }));
   await page.route('**/api/sessions', route => route.fulfill({ json: [] }));
   await page.goto('/');
@@ -98,7 +98,7 @@ test('first setup validates confirmation and uses guarded same-origin mutation',
   await page.getByRole('button', { name: '创建工作台' }).click();
   await expect(page.getByRole('heading', { name: '你的工作台' })).toBeVisible();
   expect(submitted).toBe(true);
-  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['justai-theme']);
+  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['celoom-theme']);
 });
 
 test('empty state, theme, layered settings and blank existing secret', async ({ page }, testInfo) => {
@@ -110,9 +110,9 @@ test('empty state, theme, layered settings and blank existing secret', async ({ 
   await page.screenshot({ path: testInfo.outputPath('welcome-light.png'), fullPage: true });
   const themeButton = (testInfo.project.name === 'mobile' ? page.locator('.topbar') : page.locator('.sidebar')).getByRole('button', { name: /切换到.*主题/ });
   const theme = await page.locator('html').getAttribute('data-theme');
-  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', `/brand/justaiagent-${theme}.svg`);
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', `/brand/celoom-${theme}.svg`);
   await themeButton.first().click();
-  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', `/brand/justaiagent-${theme === 'light' ? 'dark' : 'light'}.svg`);
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', `/brand/celoom-${theme === 'light' ? 'dark' : 'light'}.svg`);
   await expect(page.locator('html')).not.toHaveAttribute('data-theme', theme!);
   await page.screenshot({ path: testInfo.outputPath('welcome-dark.png'), fullPage: true });
   await openSidebar(page);
@@ -246,7 +246,7 @@ test('search settings isolate credentials, preserve blank keys and clear changed
   await expect(page.getByRole('button', { name: '保存配置' })).toBeDisabled();
   expect(submissions[1].search).toEqual({ provider: 'searxng', base_url: 'https://searx.example.test', api_key: 'dedicated-search-fixture', has_api_key: false });
   await expect(key).toHaveValue('');
-  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['justai-theme']);
+  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['celoom-theme']);
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain('search-fixture');
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
   await page.locator('.search-settings').evaluate(element => element.scrollIntoView({ block: 'start' }));
@@ -304,7 +304,7 @@ test('subagent presets choose across sites and keys, reset effort, and round tri
   await page.getByRole('article', { name: '子代理预设 2', exact: true }).getByLabel('预设名称').fill('Edited deep analysis');
   await page.getByRole('button', { name: '保存配置' }).click(); await expect(page.getByRole('button', { name: '保存配置' })).toBeDisabled();
   expect(submissions[1].subagent_models.map((entry: any) => [entry.name, entry.reasoning_effort])).toEqual([['Follow model default', null], ['Edited deep analysis', 'high']]);
-  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['justai-theme']);
+  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['celoom-theme']);
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain('Deep analysis');
 });
 
@@ -407,7 +407,7 @@ test('session route controls PATCH during a run and SSE keeps source history int
   await page.route('**/api/sessions/test-session', route => route.fulfill({ json: { session: saved, events: [event(1, 'user_message', { text: 'route fixture' }), event(2, 'assistant_source', { attempt_id: 'original', site_name: 'Actual original site', model_name: 'Actual original model', model: 'original-wire-model', reasoning_effort: 'low' }), event(3, 'assistant_message', { attempt_id: 'original', text: 'Original answer' }), event(4, 'assistant_message', { attempt_id: 'legacy', text: 'Legacy answer' })] } }));
   await page.route('**/api/sessions/test-session/files?*', route => route.fulfill({ json: { path: '', entries: [] } }));
   await page.route('**/api/sessions/test-session/settings', route => {
-    expect(route.request().method()).toBe('PATCH'); expect(route.request().headers()['x-justai-request']).toBe('1');
+    expect(route.request().method()).toBe('PATCH'); expect(route.request().headers()['x-celoom-request']).toBe('1');
     if (rejectNext) { rejectNext = false; return route.fulfill({ status: 422, json: { error: 'Fixture route validation failed' } }); }
     const body = route.request().postDataJSON(); patches.push(body); saved = { ...saved, ...body };
     return route.fulfill({ json: saved });
@@ -524,7 +524,7 @@ test('detail once then SSE after sequence, authoritative replacement, duplicate 
   });
   await page.route('**/api/sessions/test-session/messages', route => {
     const body = route.request().postDataJSON(); sentId = body.client_message_id;
-    expect(route.request().headers()['x-justai-request']).toBe('1');
+    expect(route.request().headers()['x-celoom-request']).toBe('1');
     return route.fulfill({ status: 202, json: { run_id: 'test-run' } });
   });
   await page.goto('/'); await openSidebar(page);
@@ -546,7 +546,7 @@ test('question stack answers during waiting or automatic compaction and retains 
   const answerGate = new Promise<void>(resolve => { releaseAnswer = resolve; });
   await page.route('**/api/sessions/test-session/questions/blocking-fixture/answer', async route => {
     answerRequests++; expect(route.request().postDataJSON()).toEqual({ answer: '完整验证' });
-    expect(route.request().headers()['x-justai-request']).toBe('1');
+    expect(route.request().headers()['x-celoom-request']).toBe('1');
     await answerGate; await route.fulfill({ json: { ...fixtureQuestion, status: 'answered', answer: '完整验证', updated_at: '2026-11-13T12:02:00Z' } });
   });
   let optionalAttempts = 0;
@@ -683,7 +683,7 @@ test('computer status GET never launches and host requires one clear authorizati
   let state = structuredClone(computerStatus); const requests: string[] = []; const changes: boolean[] = [];
   await page.route('**/api/computer', route => { requests.push(route.request().method()); return route.fulfill({ json: state }); });
   await page.route('**/api/computer/host', route => {
-    expect(route.request().method()).toBe('POST'); expect(route.request().headers()['x-justai-request']).toBe('1');
+    expect(route.request().method()).toBe('POST'); expect(route.request().headers()['x-celoom-request']).toBe('1');
     const { enabled } = route.request().postDataJSON(); changes.push(enabled); state.host.enabled = enabled;
     return route.fulfill({ json: state });
   });
@@ -714,7 +714,7 @@ test('global emergency stop stays direct while busy and host toggle cannot mutat
   await page.route('**/api/computer', route => route.fulfill({ json: { ...computerStatus, busy, owner: 'other-session' } }));
   await page.route('**/api/computer/host', route => { hosts++; return route.fulfill({ json: computerStatus }); });
   await page.route('**/api/computer/stop', route => {
-    stops++; expect(route.request().method()).toBe('POST'); expect(route.request().headers()['x-justai-request']).toBe('1'); busy = false;
+    stops++; expect(route.request().method()).toBe('POST'); expect(route.request().headers()['x-celoom-request']).toBe('1'); busy = false;
     return route.fulfill({ json: { ok: true } });
   });
   page.on('dialog', dialog => { dialogs++; void dialog.dismiss(); });
@@ -813,7 +813,7 @@ async function pasteSources(page: Page, items: PasteSource[], files: PasteSource
 test('paste two images plus text at cursor sends one guarded message without executing HTML', async ({ page }, testInfo) => {
   await autonomySession(page, 'completed');
   let body: any;
-  await page.route('**/api/sessions/test-session/messages', async route => { body = route.request().postDataJSON(); expect(route.request().headers()['x-justai-request']).toBe('1'); await route.fulfill({ status: 202, json: { run_id: 'paste-run' } }); });
+  await page.route('**/api/sessions/test-session/messages', async route => { body = route.request().postDataJSON(); expect(route.request().headers()['x-celoom-request']).toBe('1'); await route.fulfill({ status: 202, json: { run_id: 'paste-run' } }); });
   const input = page.getByLabel('消息内容'); await input.fill('before AFTER');
   await input.evaluate(element => (element as HTMLTextAreaElement).setSelectionRange(7, 12));
   expect(await pasteFixture(page, '中间')).toBe(true);
@@ -823,7 +823,7 @@ test('paste two images plus text at cursor sends one guarded message without exe
   await page.screenshot({ path: testInfo.outputPath('paste-two-images.png'), fullPage: true });
   await page.getByRole('button', { name: '发送消息' }).click(); await expect.poll(() => body?.images?.length).toBe(2);
   expect(body.text).toBe('before 中间'); expect(body.delivery_mode).toBe('after_call'); expect(body.client_message_id).toMatch(/^[a-f0-9-]{36}$/);
-  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['justai-theme']);
+  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['celoom-theme']);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
@@ -860,7 +860,7 @@ test('offline IndexedDB outbox survives reload and online reconnect uses latest 
   await pasteFixture(page, 'OFFLINE DURABLE', 2); await expect(page.locator('.attachment-preview')).toHaveCount(2);
   await page.getByRole('button', { name: '发送消息' }).click(); await expect(page.getByLabel('消息内容')).toHaveValue('');
   await expect(page.getByRole('region', { name: '本地待发送消息' })).toContainText('OFFLINE DURABLE');
-  const before = await page.evaluate(async () => new Promise<any[]>(resolve => { const request = indexedDB.open('justai-message-outbox'); request.onsuccess = () => { const db = request.result; const read = db.transaction('messages').objectStore('messages').getAll(); read.onsuccess = () => { db.close(); resolve(read.result); }; }; }));
+  const before = await page.evaluate(async () => new Promise<any[]>(resolve => { const request = indexedDB.open('celoom-message-outbox'); request.onsuccess = () => { const db = request.result; const read = db.transaction('messages').objectStore('messages').getAll(); read.onsuccess = () => { db.close(); resolve(read.result); }; }; }));
   expect(before[0].images).toHaveLength(2); expect(before[0].client_message_id).toBeTruthy(); expect(before[0].delivery_mode).toBe('after_call');
   await page.reload(); await openSidebar(page); await page.getByRole('button', { name: /Browser test conversation/ }).click();
   await expect(page.getByRole('region', { name: '本地待发送消息' })).toContainText('OFFLINE DURABLE');
@@ -930,7 +930,7 @@ test('sent queued Esc upgrades the same UUID without sending a draft; new sends 
   await input.evaluate(element => element.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })));
   await page.getByRole('button', { name: '发送消息' }).click(); await expect.poll(() => requests.length).toBe(1); expect(requests[0].delivery_mode).toBe('after_call');
   const interrupts: string[] = [];
-  await page.route('**/api/sessions/test-session/messages/interrupt', async route => { const body = route.request().postDataJSON(); interrupts.push(body.client_message_id); expect(route.request().headers()['x-justai-request']).toBe('1'); await route.fulfill({ json: { client_message_id: body.client_message_id, promoted: true, delivered: false, pending_acceptance: false } }); });
+  await page.route('**/api/sessions/test-session/messages/interrupt', async route => { const body = route.request().postDataJSON(); interrupts.push(body.client_message_id); expect(route.request().headers()['x-celoom-request']).toBe('1'); await route.fulfill({ json: { client_message_id: body.client_message_id, promoted: true, delivered: false, pending_acceptance: false } }); });
   await emitSessionEvent(page, event(6, 'user_message', { ...requests[0], queued: true, run_id: 'queued-esc-fixture' }));
   await input.fill('UNSENT NEXT DRAFT');
   await input.evaluate(element => { element.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })); element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); });
@@ -1061,7 +1061,7 @@ test('offline sent-message Esc persists the same UUID and immediate mode across 
   await autonomySession(page, 'running'); await page.context().setOffline(true);
   const input = page.getByLabel('消息内容'); await input.fill('OFFLINE ESC SENT');
   await page.getByRole('button', { name: '发送消息' }).click(); await expect(input).toHaveValue('');
-  const saved = async () => page.evaluate(async () => new Promise<any[]>(resolve => { const request = indexedDB.open('justai-message-outbox'); request.onsuccess = () => { const db = request.result; const read = db.transaction('messages').objectStore('messages').getAll(); read.onsuccess = () => { db.close(); resolve(read.result); }; }; }));
+  const saved = async () => page.evaluate(async () => new Promise<any[]>(resolve => { const request = indexedDB.open('celoom-message-outbox'); request.onsuccess = () => { const db = request.result; const read = db.transaction('messages').objectStore('messages').getAll(); read.onsuccess = () => { db.close(); resolve(read.result); }; }; }));
   const before = await saved(); expect(before).toHaveLength(1); expect(before[0].delivery_mode).toBe('after_call');
   await input.fill('DO NOT SEND THIS DRAFT'); await input.press('Escape');
   await expect.poll(async () => (await saved())[0]?.delivery_mode).toBe('immediate');

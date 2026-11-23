@@ -49,6 +49,13 @@ impl ComputerAction {
                     | "type"
                     | "key"
                     | "scroll"
+                    | "hover"
+                    | "back"
+                    | "wait"
+                    | "eval"
+                    | "cookies"
+                    | "handoff"
+                    | "resume_headless"
                     | "screenshot"
                     | "launch"
                     | "stop"
@@ -135,6 +142,23 @@ impl Computer {
         self.inner.host.set_enabled(enabled).await;
         json!({"browser":self.inner.browser.status().await,"desktop":self.inner.desktop.status().await,"policy":"isolated_first","busy":self.inner.action.try_lock().is_err(),"owner":self.inner.owner.lock().await.clone(),"owners":self.inner.participants.lock().await.iter().cloned().collect::<Vec<_>>(),"privilege":crate::privilege::status().await,"host":self.inner.host.status().await})
     }
+    pub async fn cookie_summary(&self) -> Value {
+        self.inner.browser.cookie_summary().await
+    }
+    pub async fn import_cookies(
+        &self,
+        cookies_json: Option<&str>,
+        cookie_header: Option<&str>,
+        url: Option<&str>,
+    ) -> Result<Value> {
+        self.inner
+            .browser
+            .import_cookies(cookies_json, cookie_header, url)
+            .await
+    }
+    pub async fn clear_cookies(&self) -> Result<()> {
+        self.inner.browser.clear_cookies().await
+    }
     pub async fn execute(
         &self,
         owner: &str,
@@ -156,7 +180,11 @@ impl Computer {
                 vec![],
             ));
         }
-        let _guard = tokio::select! {_=cancel.cancelled()=>bail!("Computer operation cancelled before dispatch"),lock=self.inner.action.lock()=>lock};
+        let _guard = if action.target() == "browser" {
+            None
+        } else {
+            Some(tokio::select! {_=cancel.cancelled()=>bail!("Computer operation cancelled before dispatch"),lock=self.inner.action.lock()=>lock})
+        };
         let global = self.inner.stop.lock().await.clone();
         let token = cancel.child_token();
         let operation_cancel = token.clone();

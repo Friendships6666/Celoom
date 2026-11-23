@@ -11,7 +11,7 @@ describe('same-origin API contract', () => {
     const [url, init] = fetch.mock.calls[0];
     expect(url).toBe('/api/login');
     expect(init.credentials).toBe('same-origin');
-    expect(init.headers['X-JustAI-Request']).toBe('1');
+    expect(init.headers['X-Celoom-Request']).toBe('1');
     expect(init.method).toBe('POST');
   });
   it('preserves the client_message_id and strips no image data prefixes implicitly', async () => {
@@ -34,7 +34,7 @@ describe('same-origin API contract', () => {
     for (const reasoning_effort of [null, '', 'high']) await api.sessionSettings('session/id', { selection, reasoning_effort });
     expect(fetch.mock.calls.map(call => JSON.parse(call[1].body).reasoning_effort)).toEqual([null, '', 'high']);
     expect(fetch.mock.calls[0][0]).toBe('/api/sessions/session%2Fid/settings');
-    expect(fetch.mock.calls[0][1]).toMatchObject({ method: 'PATCH', credentials: 'same-origin', headers: { 'X-JustAI-Request': '1' } });
+    expect(fetch.mock.calls[0][1]).toMatchObject({ method: 'PATCH', credentials: 'same-origin', headers: { 'X-Celoom-Request': '1' } });
   });
   it('encodes authenticated root-relative file listing and preview URLs', async () => {
     const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ path: '', entries: [] }))));
@@ -51,7 +51,7 @@ describe('same-origin API contract', () => {
     await api.computer(); await api.stopComputer(); await api.computerHost(true); await api.computerHost(false);
     expect(fetch.mock.calls.map(call => call[0])).toEqual(['/api/computer', '/api/computer/stop', '/api/computer/host', '/api/computer/host']);
     expect(fetch.mock.calls[0][1]).toMatchObject({ method: 'GET', credentials: 'same-origin', body: undefined });
-    for (const call of fetch.mock.calls.slice(1)) expect(call[1]).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'X-JustAI-Request': '1' } });
+    for (const call of fetch.mock.calls.slice(1)) expect(call[1]).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'X-Celoom-Request': '1' } });
     expect(fetch.mock.calls.slice(2).map(call => JSON.parse(call[1].body))).toEqual([{ enabled: true }, { enabled: false }]);
     expect(computerImageUrl('s/id', 'capture #1')).toBe('/api/sessions/s%2Fid/computer/image/capture%20%231');
   });
@@ -78,7 +78,7 @@ describe('same-origin API contract', () => {
     expect(JSON.parse(fetch.mock.calls[3][1].body)).toEqual({ title: 'Ship', objective: 'Verify output' });
     for (const call of fetch.mock.calls.slice(4)) {
       expect(call[0]).toBe('/api/sessions/s%2Fid/goals/g%2Fid');
-      expect(call[1]).toMatchObject({ method: 'PATCH', headers: { 'X-JustAI-Request': '1' } });
+      expect(call[1]).toMatchObject({ method: 'PATCH', headers: { 'X-Celoom-Request': '1' } });
     }
     expect(fetch.mock.calls.slice(4).map(call => JSON.parse(call[1].body))).toEqual([{ action: 'start' }, { action: 'pause' }, { action: 'resume' }, { action: 'cancel' }]);
   });
@@ -98,7 +98,7 @@ describe('same-origin API contract', () => {
     expect(sent.sites[0].keys[0].models.map((model: { omit_tool_strict: boolean }) => model.omit_tool_strict)).toEqual([omit_tool_strict, !omit_tool_strict]);
     expect(sent.sites[0].keys[0].models.map((model: { strict_tools: boolean }) => model.strict_tools)).toEqual([true, false]);
     expect(saved.sites[0].keys[0].models).toEqual(normalized.sites[0].keys[0].models);
-    expect(fetch.mock.calls[1][1]).toMatchObject({ method: 'PUT', credentials: 'same-origin', headers: { 'X-JustAI-Request': '1' } });
+    expect(fetch.mock.calls[1][1]).toMatchObject({ method: 'PUT', credentials: 'same-origin', headers: { 'X-Celoom-Request': '1' } });
     expect(JSON.stringify(sent)).not.toContain('returned-model-key-fixture');
     expect(config.sites[0].keys[0].secret).toBe('returned-model-key-fixture');
   });
@@ -112,7 +112,7 @@ describe('same-origin API contract', () => {
     const input = { selection, groups: ['cache'] as ['cache'], instruction_probes: [] as [], context_size: 'small' as const, extended_cache: false, pricing: null, client_request_id: '4ca04012-5ce5-4b99-a842-e4bac75a1b12' };
     fetch.mockResolvedValue(new Response('{}', { status: 200 })); await api.startQuality(input);
     expect(fetch.mock.calls[1][0]).toBe('/api/model-checks'); expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual(input);
-    expect(fetch.mock.calls[1][1]).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'X-JustAI-Request': '1' } });
+    expect(fetch.mock.calls[1][1]).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'X-Celoom-Request': '1' } });
     fetch.mockResolvedValue(new Response('{}', { status: 200 })); await api.exportQuality('run/one');
     expect(fetch.mock.calls[2][0]).toBe('/api/model-checks/run%2Fone/export'); expect(fetch.mock.calls[2][1]).toMatchObject({ method: 'GET', credentials: 'same-origin' });
   });

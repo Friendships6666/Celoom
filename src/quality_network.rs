@@ -43,6 +43,15 @@ const HEADER_NAMES: &[&str] = &[
     "request-id",
     "openai-request-id",
     "x-amzn-requestid",
+    "x-oneapi-request-id",
+    "x-newapi-request-id",
+    "x-rixapi-request-id",
+    "x-veloera-request-id",
+    "x-litellm-call-id",
+    "x-envoy-upstream-service-time",
+    "x-kong-upstream-latency",
+    "x-powered-by",
+    "server-timing",
 ];
 
 fn ms(start: Instant) -> u64 {
@@ -956,6 +965,55 @@ pub async fn observe(snapshot: &Snapshot, variant: &str, cancel: CancellationTok
                                             "unavailable",
                                             "Installed curl did not provide supported JSON timing output; no additional HEAD was sent",
                                         );
+                                    } else if !cancel.is_cancelled() {
+                                        let resolved_ip = result["network"]["connection"]
+                                            ["remote_ip"]
+                                            .as_str()
+                                            .and_then(|s| s.parse::<IpAddr>().ok())
+                                            .or_else(|| {
+                                                result["network"]["dns"]["addresses"]
+                                                    .as_array()
+                                                    .and_then(|a| a.first())
+                                                    .and_then(Value::as_str)
+                                                    .and_then(|s| s.parse::<IpAddr>().ok())
+                                            });
+                                        if let Some(ip) = resolved_ip {
+                                            let tls_sub = result["network"]["connection"]["tls"]
+                                                ["subject"]
+                                                .as_str()
+                                                .map(str::to_string);
+                                            let is_local = crate::quality_ip_report::is_bogon(ip);
+                                            let origin = format!(
+                                                "{}://{}{}",
+                                                url.scheme(),
+                                                url.host_str().unwrap_or(""),
+                                                url.port()
+                                                    .map(|p| format!(":{p}"))
+                                                    .unwrap_or_default()
+                                            );
+                                            let (report, gw) = tokio::join!(
+                                                crate::quality_ip_report::build_ip_report(
+                                                    ip,
+                                                    url.host_str(),
+                                                    tls_sub.as_deref(),
+                                                    &cancel,
+                                                ),
+                                                async {
+                                                    if is_local {
+                                                        Value::Null
+                                                    } else {
+                                                        crate::quality_ip_report::probe_gateway(
+                                                            &origin, &cancel,
+                                                        )
+                                                        .await
+                                                    }
+                                                }
+                                            );
+                                            result["network"]["ip_report"] = report;
+                                            if !gw.is_null() {
+                                                result["network"]["gateway_probe"] = gw;
+                                            }
+                                        }
                                     }
                                 }
                                 Err(error) => process_error(&mut result, error, "curl"),

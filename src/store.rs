@@ -130,7 +130,7 @@ impl Store {
         let (tx, rx) = mpsc::channel::<Operation>();
         let worker_vault = vault.clone();
         std::thread::Builder::new()
-            .name("justai-sqlite".into())
+            .name("celoom-sqlite".into())
             .spawn(move || {
                 WORKER_VAULT.with(|cell| {
                     *cell.borrow_mut() = Some(worker_vault);
@@ -217,7 +217,7 @@ impl Store {
                 );
                 match session.parent_id {
                     Some(parent) => session = load_session(db, &parent)?,
-                    None => return Ok(format!("justai:v1:{}", session.id)),
+                    None => return Ok(format!("celoom:v1:{}", session.id)),
                 }
             }
         })
@@ -321,6 +321,25 @@ impl Store {
     pub async fn session(&self, id: &str) -> Result<Session> {
         let id = id.to_owned();
         self.call(move |db| load_session(db, &id)).await
+    }
+    pub async fn rename_session(&self, id: &str, title: &str) -> Result<Session> {
+        let id = id.to_owned();
+        let title = title.trim().to_owned();
+        ensure!(
+            !title.is_empty() && title.chars().count() <= 256,
+            "Session title must contain 1-256 characters"
+        );
+        self.call(move |db| {
+            ensure!(
+                db.execute(
+                    "UPDATE sessions SET title=?2,updated_at=?3 WHERE id=?1",
+                    params![id, title, now()]
+                )? == 1,
+                "Session not found"
+            );
+            load_session(db, &id)
+        })
+        .await
     }
     pub async fn unlock_session(&self, id: &str, password: &str) -> Result<Session> {
         let id = id.to_owned();
@@ -1671,7 +1690,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let expected = format!("justai:v1:{}", parent.id);
+        let expected = format!("celoom:v1:{}", parent.id);
         assert_eq!(store.session_cache_key(&parent.id).await.unwrap(), expected);
         assert_eq!(store.session_cache_key(&child.id).await.unwrap(), expected);
         drop(store);

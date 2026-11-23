@@ -1,5 +1,5 @@
 import type { QualityCheckInput, QualityPlan, QualityRun } from './qualityChecks';
-import { defaultSearchConfig, type AppConfig, type Bootstrap, type ComputerStatus, type Diagnostic, type FileListing, type Goal, type GoalAction, type Question, type MessageInput, type InterruptionResult, type Selection, type Session, type SessionDetail, type SessionSettings } from './types';
+import { defaultSearchConfig, type AppConfig, type Bootstrap, type ComputerStatus, type Diagnostic, type FileListing, type Goal, type GoalAction, type Question, type RuntimeOverview, type MessageInput, type InterruptionResult, type Selection, type Session, type SessionDetail, type SessionSettings } from './types';
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string) { super(message); this.name = 'ApiError'; }
@@ -7,13 +7,13 @@ export class ApiError extends Error {
 export async function request<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`/api${path}`, {
     method, credentials: 'same-origin', signal,
-    headers: { Accept: 'application/json', ...(method === 'GET' ? {} : { 'X-JustAI-Request': '1' }), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+    headers: { Accept: 'application/json', ...(method === 'GET' ? {} : { 'X-Celoom-Request': '1' }), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   let data: unknown;
   try { data = await response.json(); } catch { /* Handled below, never render raw HTML or credentials. */ }
   if (!response.ok) {
-    if (response.status === 401) window.dispatchEvent(new Event('justai:unauthorized'));
+    if (response.status === 401) window.dispatchEvent(new Event('celoom:unauthorized'));
     const error = data as { error?: unknown; code?: string } | undefined;
     throw new ApiError(typeof error?.error === 'string' ? error.error : `请求失败（HTTP ${response.status}）`, response.status, error?.code);
   }
@@ -34,6 +34,7 @@ export const api = {
   qualityRun: (id: string, signal?: AbortSignal) => request<QualityRun>(`/model-checks/${encodeURIComponent(id)}`, 'GET', undefined, signal),
   cancelQuality: (id: string) => request<QualityRun>(`/model-checks/${encodeURIComponent(id)}/cancel`, 'POST', {}),
   deleteSession: (id: string) => request<{ deleted: boolean }>(`/sessions/${encodeURIComponent(id)}`, 'DELETE'),
+  renameSession: (id: string, title: string) => request<Session>(`/sessions/${encodeURIComponent(id)}`, 'PATCH', { title }),
   setSessionEncryption: (id: string, mode: 'none' | 'half' | 'full', password?: string) => request<Session>(`/sessions/${encodeURIComponent(id)}/encryption`, 'POST', password === undefined ? { mode } : { mode, password }),
   unlockSession: (id: string, password: string) => request<Session>(`/sessions/${encodeURIComponent(id)}/unlock`, 'POST', { password }),
   lockSession: (id: string) => request<Session>(`/sessions/${encodeURIComponent(id)}/lock`, 'POST', {}),
@@ -53,6 +54,14 @@ export const api = {
   computer: (signal?: AbortSignal) => request<ComputerStatus>('/computer', 'GET', undefined, signal),
   stopComputer: () => request<{ ok: true }>('/computer/stop', 'POST'),
   computerHost: (enabled: boolean) => request<unknown>('/computer/host', 'POST', { enabled }),
+  computerCookies: (signal?: AbortSignal) => request<{ count: number; domains: string[] }>('/computer/cookies', 'GET', undefined, signal),
+  importComputerCookies: (input: { cookies_json?: string; cookie_header?: string; url?: string }) => request<{ ok: true; count: number; domains: string[] }>('/computer/cookies', 'POST', input),
+  clearComputerCookies: () => request<{ ok: true }>('/computer/cookies', 'DELETE'),
+  runtimeOverview: (sessionId?: string | null, signal?: AbortSignal) => request<RuntimeOverview>(`/runtime/overview${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`, 'GET', undefined, signal),
+  resumeSubagent: (id: string) => request<{ ok: true; id: string; run_id: string }>(`/subagents/${encodeURIComponent(id)}/resume`, 'POST'),
+  cancelSubagent: (id: string) => request<{ ok: true; id: string }>(`/subagents/${encodeURIComponent(id)}/cancel`, 'POST'),
+  cancelAllSubagents: () => request<{ ok: true; cancelled: number }>('/subagents/cancel-all', 'POST'),
+  resumeLastSubagents: (sessionId?: string | null) => request<{ ok: true; resumed: string[] }>(`/subagents/resume-last${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''}`, 'POST'),
   cancel: (id: string) => request<{ ok: true }>(`/sessions/${encodeURIComponent(id)}/cancel`, 'POST'),
   compact: (id: string) => request<{ run_id: string }>(`/sessions/${encodeURIComponent(id)}/compact`, 'POST'),
 };

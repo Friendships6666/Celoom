@@ -114,7 +114,11 @@ async fn get_page(
         })?;
         let mut request = client
             .get(current.clone())
-            .header(USER_AGENT, "JustAIAgent/0.1 (text-only web tool)")
+            .header(
+                USER_AGENT,
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            )
+            .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
             .header(ACCEPT, accept);
         if let Some(key) = &key {
             request = request.header("X-Subscription-Token", key.clone());
@@ -1108,17 +1112,9 @@ async fn multi_engine_search(
     cancel: &CancellationToken,
 ) -> Result<(Vec<(Hit, Vec<String>)>, Vec<String>)> {
     let engines: &[&str] = if deep {
-        &[
-            "duckduckgo",
-            "bing",
-            "wikipedia",
-            "github",
-            "hackernews",
-            "arxiv",
-            "stackexchange",
-        ]
+        &["bing", "wikipedia", "github", "hackernews"]
     } else {
-        &["duckduckgo", "bing", "wikipedia", "hackernews"]
+        &["bing", "wikipedia", "hackernews"]
     };
     let per_engine = max.min(8);
     let tasks = engines.iter().map(|&engine| async move {

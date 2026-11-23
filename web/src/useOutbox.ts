@@ -11,9 +11,9 @@ export function useOutbox(sessionId: string | undefined, events: AgentEvent[]) {
     const unsubscribe = box.subscribe(refresh);
     const online = () => box.wake();
     window.addEventListener('online', online);
-    window.addEventListener('justai:connected', online);
+    window.addEventListener('celoom:connected', online);
     // Keep the durable payload when navigating away, including in-flight sends.
-    return () => { unsubscribe(); window.removeEventListener('online', online); window.removeEventListener('justai:connected', online); };
+    return () => { unsubscribe(); window.removeEventListener('online', online); window.removeEventListener('celoom:connected', online); };
   }, [box]);
   useEffect(() => {
     if (!box) return;

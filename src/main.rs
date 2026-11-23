@@ -1,6 +1,6 @@
 #![deny(unsafe_code)]
 #[cfg(not(target_os = "linux"))]
-compile_error!("JustAIAgent supports Linux only.");
+compile_error!("Celoom supports Linux only.");
 
 mod agent;
 mod autonomy_store;
@@ -17,6 +17,7 @@ mod models;
 mod network;
 mod privilege;
 mod quality;
+mod quality_ip_report;
 mod quality_network;
 mod quality_store;
 mod quality_transport;
@@ -93,11 +94,14 @@ impl Options {
             .unwrap_or_else(|| cwd.clone());
         let mut bind = "127.0.0.1".to_owned();
         let mut port = 4141u16;
-        let mut data_dir = std::env::var_os("JUSTAI_DATA_DIR")
+        let mut data_dir = std::env::var_os("CELOOM_DATA_DIR")
+            .or_else(|| std::env::var_os("JUSTAI_DATA_DIR"))
             .map(PathBuf::from)
-            .unwrap_or_else(|| home.join(".local/share/justaiagent"));
+            .unwrap_or_else(|| home.join(".local/share/celoom"));
         let mut workspace = cwd;
-        let mut public = std::env::var("JUSTAI_PUBLIC_URL").ok();
+        let mut public = std::env::var("CELOOM_PUBLIC_URL")
+            .or_else(|_| std::env::var("JUSTAI_PUBLIC_URL"))
+            .ok();
         let mut args = std::env::args().skip(1);
         while let Some(arg) = args.next() {
             match arg.as_str() {
@@ -114,7 +118,7 @@ impl Options {
                 }
                 "--help" | "-h" => {
                     println!(
-                        "JustAIAgent — Linux local AI, controlled from a browser\n\njustaiagent [--bind 127.0.0.1] [--port 4141] [--workspace PATH]\n            [--data-dir PATH] [--public-url https://agent.example.com]\n\nSet the initial password locally before exposing the application.\nRemote access requires an HTTPS reverse proxy/tunnel and --public-url.\nNo interactive CLI, plugins or MCP."
+                        "Celoom — Linux local AI, controlled from a browser\n\nceloom [--bind 127.0.0.1] [--port 4141] [--workspace PATH]\n       [--data-dir PATH] [--public-url https://agent.example.com]\n\nSet the initial password locally before exposing the application.\nRemote access requires an HTTPS reverse proxy/tunnel and --public-url.\nNo interactive CLI, plugins or MCP."
                     );
                     std::process::exit(0);
                 }
@@ -190,7 +194,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "justaiagent=info,tower_http=warn".into()),
+                .unwrap_or_else(|_| "celoom=info,tower_http=warn".into()),
         )
         .init();
     let options = Options::parse()?;
@@ -204,13 +208,22 @@ async fn main() -> Result<()> {
         .open(options.data_dir.join("instance.lock"))?;
     let _instance_lock =
         nix::fcntl::Flock::lock(lock_file, nix::fcntl::FlockArg::LockExclusiveNonblock).map_err(
-            |_| anyhow::anyhow!("Another JustAIAgent instance owns this data directory"),
+            |_| anyhow::anyhow!("Another Celoom instance owns this data directory"),
         )?;
     ensure!(
         Assets::get("index.html").is_some(),
         "Web assets missing. Run npm ci && npm run build in web before cargo build."
     );
-    let store = Store::open(&options.data_dir.join("justai.sqlite3"))?;
+    let db_path = {
+        let celoom_db = options.data_dir.join("celoom.sqlite3");
+        let legacy_db = options.data_dir.join("justai.sqlite3");
+        if !celoom_db.exists() && legacy_db.exists() {
+            legacy_db
+        } else {
+            celoom_db
+        }
+    };
+    let store = Store::open(&db_path)?;
     ensure!(
         options.public_url.is_none() || store.password_hash().await?.is_some(),
         "Initialize the password locally without --public-url before enabling remote access"
@@ -230,7 +243,7 @@ async fn main() -> Result<()> {
     let listener = tokio::net::TcpListener::bind(address)
         .await
         .context("Cannot bind application listener")?;
-    tracing::info!("JustAIAgent ready at http://{address}");
+    tracing::info!("Celoom ready at http://{address}");
     if let Some(url) = &state.options.public_url {
         tracing::info!(
             "Configured remote origin: {}",
@@ -286,11 +299,27 @@ fn app(state: AppState) -> Router {
         .route("/api/computer/stop", post(computer_stop))
         .route("/api/computer/host", post(computer_host_policy))
         .route(
+            "/api/computer/cookies",
+            get(computer_cookies_get)
+                .post(computer_cookies_import)
+                .delete(computer_cookies_clear),
+        )
+        .route("/api/runtime/overview", get(runtime_overview_route))
+        .route("/api/subagents/{id}/resume", post(subagent_resume_route))
+        .route("/api/subagents/{id}/cancel", post(subagent_cancel_route))
+        .route("/api/subagents/cancel-all", post(subagents_cancel_all_route))
+        .route("/api/subagents/resume-last", post(subagents_resume_last_route))
+        .route(
             "/api/sessions/{id}/computer/image/{capture_id}",
             get(computer_capture),
         )
         .route("/api/sessions", get(list_sessions).post(create_session))
-        .route("/api/sessions/{id}", get(session_detail).delete(delete_session_route))
+        .route(
+            "/api/sessions/{id}",
+            get(session_detail)
+                .patch(rename_session_route)
+                .delete(delete_session_route),
+        )
         .route(
             "/api/sessions/{id}/encryption",
             post(set_session_encryption_route),
@@ -370,7 +399,7 @@ fn token(headers: &HeaderMap) -> Option<&str> {
         .to_str()
         .ok()?
         .split(';')
-        .find_map(|s| s.trim().strip_prefix("justai_session="))
+        .find_map(|s| s.trim().strip_prefix("celoom_session="))
         .filter(|t| t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 fn token_hash(t: &str) -> String {
@@ -406,7 +435,7 @@ async fn guard(State(state): State<AppState>, request: Request, next: Next) -> R
     if request.method() != axum::http::Method::GET && request.method() != axum::http::Method::HEAD {
         if request
             .headers()
-            .get("x-justai-request")
+            .get("x-celoom-request")
             .and_then(|v| v.to_str().ok())
             != Some("1")
         {
@@ -478,7 +507,7 @@ async fn bootstrap(
     let initialized = state.store.password_hash().await?.is_some();
     let auth = authenticated(&state, &headers).await;
     Ok(Json(
-        json!({"initialized":initialized,"authenticated":auth,"allow_setup":peer.ip().is_loopback()&&state.options.is_local_host(&headers),"version":env!("CARGO_PKG_VERSION"),"workspace":if auth{Some(state.options.workspace.display().to_string())}else{None}}),
+        json!({"initialized":initialized,"authenticated":auth,"allow_setup":peer.ip().is_loopback()&&state.options.is_local_host(&headers),"version":env!("CARGO_PKG_VERSION"),"workspace":if auth{Some(state.options.workspace.display().to_string())}else{None},"data_dir":if auth{Some(state.store.data_dir().display().to_string())}else{None}}),
     ))
 }
 #[derive(Deserialize)]
@@ -539,7 +568,7 @@ async fn issue_session(
     }
     let mut response = Json(json!({"ok":true})).into_response();
     let cookie = format!(
-        "justai_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800{}",
+        "celoom_session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800{}",
         if state.options.secure_cookie(headers) {
             "; Secure"
         } else {
@@ -675,7 +704,7 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<
     response.headers_mut().insert(
         header::SET_COOKIE,
         HeaderValue::from_str(&format!(
-            "justai_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0{}",
+            "celoom_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0{}",
             if state.options.secure_cookie(&headers) {
                 "; Secure"
             } else {
@@ -745,6 +774,49 @@ struct TestRequest {
 async fn computer_status(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     Ok(Json(state.engine.computer().status().await))
 }
+#[derive(Deserialize)]
+struct RuntimeOverviewQuery {
+    session_id: Option<String>,
+}
+async fn runtime_overview_route(
+    State(state): State<AppState>,
+    Query(query): Query<RuntimeOverviewQuery>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(
+        state
+            .engine
+            .runtime_overview(query.session_id.as_deref())
+            .await?,
+    ))
+}
+async fn subagent_resume_route(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    let run_id = state.engine.resume_subagent(&id).await?;
+    Ok(Json(json!({ "ok": true, "id": id, "run_id": run_id })))
+}
+async fn subagent_cancel_route(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    state.engine.cancel_subagent(&id).await?;
+    Ok(Json(json!({ "ok": true, "id": id })))
+}
+async fn subagents_cancel_all_route(State(state): State<AppState>) -> ApiResult<Json<Value>> {
+    let count = state.engine.cancel_all_subagents().await?;
+    Ok(Json(json!({ "ok": true, "cancelled": count })))
+}
+async fn subagents_resume_last_route(
+    State(state): State<AppState>,
+    Query(query): Query<RuntimeOverviewQuery>,
+) -> ApiResult<Json<Value>> {
+    let resumed = state
+        .engine
+        .resume_last_cancelled_subagents(query.session_id.as_deref())
+        .await?;
+    Ok(Json(json!({ "ok": true, "resumed": resumed })))
+}
 async fn computer_stop(State(state): State<AppState>) -> ApiResult<Json<Value>> {
     state.engine.emergency_computer_stop().await?;
     Ok(Json(json!({"ok":true})))
@@ -765,6 +837,36 @@ async fn computer_host_policy(
             .set_host_enabled(policy.enabled)
             .await?,
     ))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ImportCookiesBody {
+    cookies_json: Option<String>,
+    cookie_header: Option<String>,
+    url: Option<String>,
+}
+async fn computer_cookies_get(State(state): State<AppState>) -> ApiResult<Json<Value>> {
+    Ok(Json(state.engine.computer().cookie_summary().await))
+}
+async fn computer_cookies_import(
+    State(state): State<AppState>,
+    Json(body): Json<ImportCookiesBody>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(
+        state
+            .engine
+            .computer()
+            .import_cookies(
+                body.cookies_json.as_deref(),
+                body.cookie_header.as_deref(),
+                body.url.as_deref(),
+            )
+            .await?,
+    ))
+}
+async fn computer_cookies_clear(State(state): State<AppState>) -> ApiResult<Json<Value>> {
+    state.engine.computer().clear_cookies().await?;
+    Ok(Json(json!({ "ok": true })))
 }
 async fn computer_capture(
     State(state): State<AppState>,
@@ -819,11 +921,24 @@ async fn create_session(
             "Select a configured model".into(),
         ));
     }
-    let path = body
-        .cwd
-        .filter(|s| !s.trim().is_empty())
+    let home_dir = std::env::var_os("HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| state.options.workspace.clone());
+    let path = match body.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some("~") => home_dir.clone(),
+        Some(raw) if raw.starts_with("~/") => home_dir.join(&raw[2..]),
+        Some(raw) => PathBuf::from(raw),
+        None => home_dir.join(format!(
+            "JAA-{}",
+            chrono::Local::now().format("%Y%m%d-%H%M%S")
+        )),
+    };
+    tokio::fs::create_dir_all(&path).await.map_err(|_| {
+        ApiError(
+            StatusCode::BAD_REQUEST,
+            "Cannot create working directory".into(),
+        )
+    })?;
     let cwd = tokio::fs::canonicalize(path).await.map_err(|_| {
         ApiError(
             StatusCode::BAD_REQUEST,
@@ -861,6 +976,18 @@ async fn session_detail(
         state.store.events(&id, 0).await?
     };
     Ok(Json(json!({"session":session,"events":events})))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SessionRenameInput {
+    title: String,
+}
+async fn rename_session_route(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<SessionRenameInput>,
+) -> ApiResult<Json<Session>> {
+    Ok(Json(state.store.rename_session(&id, &body.title).await?))
 }
 async fn delete_session_route(
     State(state): State<AppState>,
@@ -1331,7 +1458,7 @@ mod tests {
                     .uri("/api/login")
                     .header("host", "127.0.0.1:4141")
                     .header("origin", "https://evil.example")
-                    .header("x-justai-request", "1")
+                    .header("x-celoom-request", "1")
                     .header("content-type", "application/json")
                     .body(Body::from(r#"{"password":"not-the-password"}"#))
                     .unwrap(),
@@ -1348,7 +1475,7 @@ mod tests {
             .uri("/api/setup")
             .header("host", "127.0.0.1:4141")
             .header("origin", "http://127.0.0.1:4141")
-            .header("x-justai-request", "1")
+            .header("x-celoom-request", "1")
             .header("content-type", "application/json")
             .body(Body::from(r#"{"password":"a-long-password"}"#))
             .unwrap();

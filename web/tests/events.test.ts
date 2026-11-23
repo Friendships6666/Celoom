@@ -22,7 +22,7 @@ describe('session routing and file event contracts', () => {
     expect(result[1]).toMatchObject({ kind: 'assistant', source: { site_name: 'New site', model_name: 'New model' } });
     expect(assistantLabel(source, { site: { name: 'Current site' }, model: { name: 'Current model', model: 'current' } })).toBe('Original site - Original model');
     expect(assistantLabel(undefined, { site: { name: 'Current site' }, model: { name: 'Current model', model: 'current' } })).toBe('Current site - Current model');
-    expect(assistantLabel()).not.toContain('JustAI');
+    expect(assistantLabel()).not.toContain('Celoom');
   });
   it('keeps actual files at every round end including empty rounds and rejects unsafe paths', () => {
     const result = timeline([event(1, 'user_message', { text: 'first' }), event(2, 'assistant_message', { attempt_id: 'a', text: 'done' }), event(3, 'turn_files', { run_id: 'first', files: [{ path: 'site/index.html', name: 'index.html', kind: 'new' }, { path: '../secret', name: 'secret', kind: 'new' }] }), event(4, 'user_message', { text: 'second' }), event(5, 'turn_files', { run_id: 'second', files: [] })]);

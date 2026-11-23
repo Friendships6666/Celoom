@@ -35,8 +35,25 @@ type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 #[derive(Clone)]
 pub struct BrowserController {
     data_dir: PathBuf,
-    state: Arc<Mutex<Option<BrowserSession>>>,
+    slots: Arc<Mutex<HashMap<String, Arc<BrowserSlot>>>>,
     network: Arc<Mutex<NetworkConfig>>,
+}
+struct BrowserSlot {
+    state: Mutex<Option<BrowserSession>>,
+    handoff: Mutex<Option<HandoffWindow>>,
+}
+impl BrowserSlot {
+    fn new() -> Self {
+        Self {
+            state: Mutex::new(None),
+            handoff: Mutex::new(None),
+        }
+    }
+}
+struct HandoffWindow {
+    owner: String,
+    child: Child,
+    url: String,
 }
 struct BrowserSession {
     owner: String,
@@ -108,66 +125,78 @@ impl BrowserController {
     pub fn new(data_dir: PathBuf) -> Self {
         Self {
             data_dir,
-            state: Arc::new(Mutex::new(None)),
+            slots: Arc::new(Mutex::new(HashMap::new())),
             network: Arc::new(Mutex::new(NetworkConfig::default())),
         }
     }
+    async fn slot_for(&self, owner: &str) -> Arc<BrowserSlot> {
+        let mut slots = self.slots.lock().await;
+        slots
+            .entry(owner.to_owned())
+            .or_insert_with(|| Arc::new(BrowserSlot::new()))
+            .clone()
+    }
     pub async fn configure_network(&self, network: NetworkConfig) -> Result<()> {
-        let requested = resolve_browser_route(&network, process_env)?;
-        // Same lock order as execute: session first, network second.
-        let state = self.state.lock().await;
-        if let Some(session) = state.as_ref() {
-            ensure!(
-                session.network_route == requested,
-                "BROWSER_NETWORK_CHANGED: stop and reopen the private browser to apply the changed network route"
-            );
-        }
+        let _ = resolve_browser_route(&network, process_env)?;
         *self.network.lock().await = network;
         Ok(())
     }
     pub async fn status(&self) -> Value {
         let binary = browser_binary();
-        let guard = self.state.try_lock();
-        let (running, owner, sandbox) = match &guard {
-            Ok(state) => (
-                state.as_ref().is_some_and(|s| s.healthy),
-                state.as_ref().map(|s| s.owner.clone()),
-                state.as_ref().map(|s| s.sandbox),
-            ),
-            Err(_) => (true, None, None),
-        };
-        let network = match &guard {
-            Ok(state) => match state.as_ref() {
-                Some(session) => session.network_route.summary(),
-                None => match self.network.try_lock() {
-                    Ok(config) => match resolve_browser_route(&config, process_env) {
-                        Ok(route) => route.summary(),
-                        Err(error) => json!({"valid":false,"error":error.to_string()}),
-                    },
-                    Err(_) => json!({"busy":true}),
-                },
+        let slots: Vec<(String, Arc<BrowserSlot>)> = self
+            .slots
+            .lock()
+            .await
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        let mut running = false;
+        let mut owners = Vec::new();
+        let mut sandbox = None;
+        for (id, slot) in &slots {
+            if let Ok(st) = slot.state.try_lock()
+                && let Some(s) = st.as_ref()
+                && s.healthy
+            {
+                running = true;
+                owners.push(id.clone());
+                sandbox = Some(s.sandbox);
+            }
+        }
+        let network = match self.network.try_lock() {
+            Ok(config) => match resolve_browser_route(&config, process_env) {
+                Ok(route) => route.summary(),
+                Err(error) => json!({"valid":false,"error":error.to_string()}),
             },
-            Err(_) => json!({"busy":true,"route_available_after_operation":true}),
+            Err(_) => json!({"busy":true}),
         };
-        json!({"available":binary.is_some(),"binary":binary,"running":running,"busy":guard.is_err(),"network":network,
-            "owner":owner,"isolation":"private_profile_headless",
+        json!({"available":binary.is_some(),"binary":binary,"running":running,"busy":false,"network":network,
+            "owner":owners.first().cloned(),"owners":owners,"active_count":owners.len(),"isolation":"exclusive_per_session_profile",
             "host_input":false,"attached":false,"viewport":{"width":WIDTH,"height":HEIGHT},
             "sandbox":sandbox,
-            "capabilities":["open","observe","click","fill","type","key","scroll","screenshot","stop"],
-            "limitations":["DOM references cover the main frame and open shadow roots; cross-origin frames require a future frame-session backend.","Private profile is not an OS security sandbox.","No implicit existing-browser attach or arbitrary evaluate tool."]})
+            "capabilities":["open","observe","click","fill","type","key","scroll","hover","back","wait","eval","cookies","handoff","resume_headless","screenshot","stop"],
+            "limitations":["Each session owns an exclusive isolated browser instance; unlimited concurrent sessions supported.","Persistent cookies imported via settings are shared into each new browser instance."]})
     }
     pub async fn stop(&self, owner: Option<&str>) -> Result<()> {
-        let mut guard = self.state.lock().await;
-        if let Some(session) = guard.as_ref() {
-            ensure!(
-                owner.is_none_or(|o| o == session.owner),
-                "BROWSER_BUSY: owned by a different session"
-            );
-        }
-        if let Some(mut session) = guard.take() {
-            terminate(&mut session).await;
+        let targets: Vec<Arc<BrowserSlot>> = match owner {
+            Some(id) => {
+                let slots = self.slots.lock().await;
+                slots.get(id).cloned().into_iter().collect()
+            }
+            None => self.slots.lock().await.values().cloned().collect(),
+        };
+        for slot in targets {
+            let mut guard = slot.state.lock().await;
+            if let Some(mut session) = guard.take() {
+                terminate(&mut session).await;
+            }
+            drop(guard);
+            close_slot_handoff(&slot).await;
         }
         Ok(())
+    }
+    async fn close_handoff(slot: &BrowserSlot) -> Option<String> {
+        close_slot_handoff(slot).await
     }
     pub async fn execute(
         &self,
@@ -186,18 +215,125 @@ impl BrowserController {
         ensure!(
             matches!(
                 action.action.as_str(),
-                "open" | "observe" | "click" | "fill" | "type" | "key" | "scroll" | "screenshot"
+                "open" | "observe" | "click" | "fill" | "type" | "key" | "scroll" | "hover" | "back" | "wait" | "eval" | "cookies" | "handoff" | "resume_headless" | "screenshot"
             ),
             "Unsupported browser action"
         );
-        let mut guard = self.state.lock().await;
-        if let Some(s) = guard.as_ref() {
-            ensure!(
-                s.owner == owner,
-                "BROWSER_BUSY: owned by a different session"
-            );
+        let slot = self.slot_for(owner).await;
+        let mut guard = slot.state.lock().await;
+        if action.action == "handoff" {
+            let mut target_url = action.url.clone();
+            if target_url.is_none()
+                && let Some(session) = guard.as_mut()
+                && let Ok(loc) = session.location(&cancel).await
+            {
+                target_url = loc["url"].as_str().map(str::to_string);
+            }
+            let target_url = target_url
+                .filter(|u| !u.trim().is_empty() && u != "about:blank")
+                .unwrap_or_else(|| "https://www.jd.com".to_string());
+            validate_url(&target_url)?;
+            if let Some(mut session) = guard.take() {
+                terminate(&mut session).await;
+            }
+            Self::close_handoff(&slot).await;
+            let binary = browser_binary().context(
+                "BROWSER_UNAVAILABLE: install Chromium/Chrome or set absolute CELOOM_BROWSER_PATH",
+            )?;
+            let profile = profile_for(&self.data_dir, owner).await?;
+            for lock_file in [
+                "DevToolsActivePort",
+                "SingletonLock",
+                "SingletonSocket",
+                "SingletonCookie",
+            ] {
+                let _ = tokio::fs::remove_file(profile.join(lock_file)).await;
+            }
+            let route = resolve_browser_route(&*self.network.lock().await, process_env)?;
+            let mut cmd = Command::new(binary);
+            cmd.env_clear();
+            for name in [
+                "HOME",
+                "PATH",
+                "LANG",
+                "LC_ALL",
+                "TZ",
+                "DISPLAY",
+                "WAYLAND_DISPLAY",
+                "XAUTHORITY",
+                "DBUS_SESSION_BUS_ADDRESS",
+                "XDG_RUNTIME_DIR",
+                "TMPDIR",
+            ] {
+                if let Some(value) = std::env::var_os(name) {
+                    cmd.env(name, value);
+                }
+            }
+            cmd.args([
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-sync",
+                "--disable-blink-features=AutomationControlled",
+                "--lang=zh-CN",
+                "--password-store=basic",
+                "--window-size=1280,860",
+                "--new-window",
+            ])
+            .args(route.flags())
+            .arg(format!("--user-data-dir={}", profile.display()))
+            .arg(&target_url)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .process_group(0);
+            if crate::privilege::uid() == 0
+                && std::env::var("CELOOM_BROWSER_ALLOW_NO_SANDBOX").as_deref() == Ok("1")
+            {
+                cmd.arg("--no-sandbox");
+            }
+            let child = cmd.spawn().context("Cannot launch visible browser window for handoff")?;
+            *slot.handoff.lock().await = Some(HandoffWindow {
+                owner: owner.to_owned(),
+                child,
+                url: target_url.clone(),
+            });
+            return output(json!({
+                "ok": true,
+                "action": "handoff",
+                "url": target_url,
+                "message": "Visible browser window opened on your desktop. Call ask_user(blocking=true) now to wait for the user to complete CAPTCHA/login and click Continue; then call computer(target='browser', action='resume_headless') to close the popup and resume headless."
+            }));
         }
+        let resumed_url = Self::close_handoff(&slot).await;
         if guard.is_none() {
+            if action.action == "cookies" {
+                return output(self.cookie_summary().await);
+            }
+            if action.action == "resume_headless" {
+                let target_url = action
+                    .url
+                    .clone()
+                    .or(resumed_url)
+                    .unwrap_or_else(|| "about:blank".to_string());
+                let route = resolve_browser_route(&*self.network.lock().await, process_env)?;
+                *guard = Some(launch(&self.data_dir, owner, &route, &cancel).await?);
+                let session = guard.as_mut().unwrap();
+                let open_act = ComputerAction {
+                    action: "open".into(),
+                    target: Some("browser".into()),
+                    ref_id: None,
+                    url: Some(target_url),
+                    text: None,
+                    x: None,
+                    y: None,
+                    key: None,
+                    button: None,
+                    delta: None,
+                    argv: None,
+                };
+                return session.perform(&open_act, &cancel).await;
+            }
             ensure!(
                 action.action == "open",
                 "BROWSER_NOT_RUNNING: use open first"
@@ -221,6 +357,134 @@ impl BrowserController {
             terminate(&mut old).await;
         }
         result
+    }
+    fn cookies_path(&self) -> PathBuf {
+        self.data_dir.join("computer").join("imported-cookies.json")
+    }
+    pub async fn cookie_summary(&self) -> Value {
+        let path = self.cookies_path();
+        let Ok(raw) = tokio::fs::read_to_string(&path).await else {
+            return json!({"count":0,"domains":[]});
+        };
+        let Ok(list) = serde_json::from_str::<Vec<Value>>(&raw) else {
+            return json!({"count":0,"domains":[]});
+        };
+        let mut domains: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+        for c in &list {
+            if let Some(d) = c["domain"].as_str().or_else(|| c["url"].as_str()) {
+                domains.insert(d.to_string());
+            }
+        }
+        json!({"count": list.len(), "domains": domains.into_iter().collect::<Vec<_>>()})
+    }
+    pub async fn clear_cookies(&self) -> Result<()> {
+        let _ = tokio::fs::remove_file(self.cookies_path()).await;
+        let slots: Vec<Arc<BrowserSlot>> = self.slots.lock().await.values().cloned().collect();
+        let cancel = CancellationToken::new();
+        for slot in slots {
+            let mut guard = slot.state.lock().await;
+            if let Some(session) = guard.as_mut() {
+                let _ = session
+                    .rpc("Network.clearBrowserCookies", json!({}), &cancel)
+                    .await;
+            }
+        }
+        Ok(())
+    }
+    pub async fn import_cookies(
+        &self,
+        cookies_json: Option<&str>,
+        cookie_header: Option<&str>,
+        url: Option<&str>,
+    ) -> Result<Value> {
+        let mut parsed_cookies: Vec<Value> = Vec::new();
+        if let Some(raw_json) = cookies_json.map(str::trim).filter(|s| !s.is_empty()) {
+            let arr: Vec<Value> =
+                serde_json::from_str(raw_json).context("Cookies JSON must be a JSON array")?;
+            for item in arr {
+                let Some(name) = item["name"].as_str() else {
+                    continue;
+                };
+                let Some(value) = item["value"].as_str() else {
+                    continue;
+                };
+                let mut c = json!({ "name": name, "value": value });
+                if let Some(d) = item["domain"].as_str() {
+                    c["domain"] = json!(d);
+                } else if let Some(u) = url {
+                    c["url"] = json!(u);
+                }
+                if let Some(p) = item["path"].as_str() {
+                    c["path"] = json!(p);
+                } else {
+                    c["path"] = json!("/");
+                }
+                if let Some(s) = item["secure"].as_bool() {
+                    c["secure"] = json!(s);
+                }
+                if let Some(h) = item["httpOnly"].as_bool() {
+                    c["httpOnly"] = json!(h);
+                }
+                if let Some(exp) = item["expirationDate"].as_f64() {
+                    c["expires"] = json!(exp);
+                }
+                parsed_cookies.push(c);
+            }
+        } else if let Some(header) = cookie_header.map(str::trim).filter(|s| !s.is_empty()) {
+            let target_url = url
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .context("Cookie header import requires target url (e.g. https://www.jd.com)")?;
+            validate_url(target_url)?;
+            let clean = header
+                .strip_prefix("Cookie:")
+                .or_else(|| header.strip_prefix("cookie:"))
+                .unwrap_or(header);
+            for pair in clean.split(';') {
+                let Some((k, v)) = pair.trim().split_once('=') else {
+                    continue;
+                };
+                let name = k.trim();
+                if name.is_empty() {
+                    continue;
+                }
+                parsed_cookies.push(json!({
+                    "name": name,
+                    "value": v.trim(),
+                    "url": target_url,
+                }));
+            }
+        } else {
+            bail!("Provide cookies_json or cookie_header");
+        }
+        ensure!(!parsed_cookies.is_empty(), "No valid cookies found");
+        ensure!(parsed_cookies.len() <= 500, "Too many cookies (max 500)");
+
+        let dir = self.data_dir.join("computer");
+        tokio::fs::create_dir_all(&dir).await?;
+        let path = self.cookies_path();
+        let bytes = serde_json::to_vec(&parsed_cookies)?;
+        tokio::fs::write(&path, &bytes).await?;
+        use std::os::unix::fs::PermissionsExt;
+        let _ = tokio::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).await;
+
+        let slots: Vec<Arc<BrowserSlot>> = self.slots.lock().await.values().cloned().collect();
+        let cancel = CancellationToken::new();
+        for slot in slots {
+            let mut guard = slot.state.lock().await;
+            if let Some(session) = guard.as_mut() {
+                let _ = session
+                    .rpc(
+                        "Network.setCookies",
+                        json!({ "cookies": parsed_cookies }),
+                        &cancel,
+                    )
+                    .await;
+            }
+        }
+        let mut summary = self.cookie_summary().await;
+        summary["ok"] = json!(true);
+        Ok(summary)
     }
 }
 fn process_env(name: &str) -> Option<String> {
@@ -421,7 +685,7 @@ fn executable(path: &Path) -> bool {
         .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
 }
 fn browser_binary() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("JUSTAI_BROWSER_PATH") {
+    if let Some(path) = std::env::var_os("CELOOM_BROWSER_PATH") {
         let p = PathBuf::from(path);
         return (p.is_absolute() && executable(&p)).then_some(p);
     }
@@ -488,6 +752,36 @@ fn endpoint_from_active_port(text: &str) -> Result<String> {
     );
     Ok(format!("ws://127.0.0.1:{port}{path}"))
 }
+async fn close_slot_handoff(slot: &BrowserSlot) -> Option<String> {
+    let mut h = slot.handoff.lock().await;
+    if let Some(mut win) = h.take() {
+        if let Some(pid) = win.child.id() {
+            let _ = nix::sys::signal::killpg(
+                nix::unistd::Pid::from_raw(pid as i32),
+                nix::sys::signal::Signal::SIGKILL,
+            );
+        }
+        let _ = win.child.start_kill();
+        let _ = timeout(Duration::from_secs(2), win.child.wait()).await;
+        Some(win.url)
+    } else {
+        None
+    }
+}
+async fn profile_for(data_dir: &Path, owner: &str) -> Result<PathBuf> {
+    let root = data_dir.join("computer").join("profiles");
+    tokio::fs::create_dir_all(&root).await?;
+    let safe_owner: String = owner
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .take(64)
+        .collect();
+    let profile = root.join(if safe_owner.is_empty() { "default" } else { &safe_owner });
+    tokio::fs::create_dir_all(&profile).await?;
+    use std::os::unix::fs::PermissionsExt;
+    tokio::fs::set_permissions(&profile, std::fs::Permissions::from_mode(0o700)).await?;
+    Ok(tokio::fs::canonicalize(profile).await?)
+}
 async fn launch(
     data_dir: &Path,
     owner: &str,
@@ -495,18 +789,15 @@ async fn launch(
     cancel: &CancellationToken,
 ) -> Result<BrowserSession> {
     let binary = browser_binary().context(
-        "BROWSER_UNAVAILABLE: install Chromium/Chrome or set absolute JUSTAI_BROWSER_PATH",
+        "BROWSER_UNAVAILABLE: install Chromium/Chrome or set absolute CELOOM_BROWSER_PATH",
     )?;
-    let root = data_dir.join("computer");
-    tokio::fs::create_dir_all(&root).await?;
-    let profile = root.join(format!("browser-{}", uuid::Uuid::new_v4()));
-    tokio::fs::create_dir(&profile).await?;
-    use std::os::unix::fs::PermissionsExt;
-    tokio::fs::set_permissions(&profile, std::fs::Permissions::from_mode(0o700)).await?;
-    let profile = tokio::fs::canonicalize(profile).await?;
+    let profile = profile_for(data_dir, owner).await?;
+    for lock_file in ["DevToolsActivePort", "SingletonLock", "SingletonSocket", "SingletonCookie"] {
+        let _ = tokio::fs::remove_file(profile.join(lock_file)).await;
+    }
     // Never silently disable Chromium's sandbox. This operator-only escape is restricted to root.
     let no_sandbox = crate::privilege::uid() == 0
-        && std::env::var("JUSTAI_BROWSER_ALLOW_NO_SANDBOX").as_deref() == Ok("1");
+        && std::env::var("CELOOM_BROWSER_ALLOW_NO_SANDBOX").as_deref() == Ok("1");
     let mut command = Command::new(binary);
     command.env_clear();
     for name in [
@@ -532,6 +823,9 @@ async fn launch(
             "--disable-background-networking",
             "--disable-sync",
             "--disable-extensions",
+            "--disable-blink-features=AutomationControlled",
+            "--lang=zh-CN",
+            "--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
             "--password-store=basic",
             "--window-size=1280,800",
         ])
@@ -609,6 +903,15 @@ async fn launch(
         terminate(&mut session).await;
         return Err(error);
     }
+    let cookies_file = data_dir.join("computer").join("imported-cookies.json");
+    if let Ok(raw) = tokio::fs::read_to_string(&cookies_file).await
+        && let Ok(cookies) = serde_json::from_str::<Vec<Value>>(&raw)
+        && !cookies.is_empty()
+    {
+        let _ = session
+            .rpc("Network.setCookies", json!({ "cookies": cookies }), cancel)
+            .await;
+    }
     Ok(session)
 }
 async fn remove_profile(profile: &Path) {
@@ -626,6 +929,7 @@ async fn remove_profile(profile: &Path) {
             .await
             .is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink());
     if valid {
+        // Keep persistent profile intact; only clean ephemeral browser-UUID dirs if any remain.
         let _ = tokio::fs::remove_dir_all(profile).await;
     }
 }
@@ -816,11 +1120,14 @@ impl BrowserSession {
                     });
                     // Readiness queries are read-only and may fail transiently while the old
                     // execution context is destroyed. No navigation/input is ever retried.
-                    if loaded
-                        && let Ok(location) = self.location(cancel).await
-                        && (location["ready"] == "complete" || location["ready"] == "interactive")
-                    {
-                        break;
+                    if let Ok(location) = self.location(cancel).await {
+                        let ready = location["ready"].as_str().unwrap_or("");
+                        let cur_url = location["url"].as_str().unwrap_or("");
+                        if (loaded && (ready == "complete" || ready == "interactive"))
+                            || (start.elapsed() >= Duration::from_secs(7) && !cur_url.is_empty() && cur_url != "about:blank")
+                        {
+                            break;
+                        }
                     }
                     ensure!(self.healthy, "Browser disconnected during navigation");
                     ensure!(
@@ -831,7 +1138,7 @@ impl BrowserSession {
                 }
                 self.observe(cancel).await
             }
-            "observe" => self.observe(cancel).await,
+            "observe" | "resume_headless" => self.observe(cancel).await,
             "screenshot" => self.screenshot(cancel).await,
             "click" => {
                 let (x, y, epoch) = if let Some(id) = action.ref_id.as_deref() {
@@ -972,6 +1279,132 @@ impl BrowserSession {
                 .await?;
                 self.action_reply("scroll", cancel).await
             }
+            "hover" => {
+                let (x, y) = if let Some(id) = action.ref_id.as_deref() {
+                    let (object, _) = self.resolve_ref(id, cancel).await?;
+                    let meta = self.on_node(&object, METADATA, json!([]), cancel).await?;
+                    let rect = &meta["rect"];
+                    (
+                        number(rect, "x")? + number(rect, "width")? / 2.0,
+                        number(rect, "y")? + number(rect, "height")? / 2.0,
+                    )
+                } else {
+                    let x = action.x.context("hover requires ref_id or x/y")? as f64;
+                    let y = action.y.context("hover requires ref_id or x/y")? as f64;
+                    check_point(x, y)?;
+                    (x, y)
+                };
+                self.rpc(
+                    "Input.dispatchMouseEvent",
+                    json!({"type":"mouseMoved","x":x,"y":y}),
+                    cancel,
+                )
+                .await?;
+                self.action_reply("hover", cancel).await
+            }
+            "back" => {
+                self.invalidate();
+                self.rpc(
+                    "Runtime.evaluate",
+                    json!({"expression":"history.back()","returnByValue":true}),
+                    cancel,
+                )
+                .await?;
+                tokio::select! { _ = cancel.cancelled() => bail!("Cancelled"), _ = tokio::time::sleep(Duration::from_millis(500)) => {} }
+                self.observe(cancel).await
+            }
+            "wait" => {
+                let ms = action.delta.unwrap_or(1500).clamp(100, 10000) as u64;
+                if let Some(selector) = action.text.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                    let expr = format!(
+                        "Boolean(document.querySelector({}))",
+                        serde_json::to_string(selector)?
+                    );
+                    let start = Instant::now();
+                    loop {
+                        let res = self
+                            .rpc(
+                                "Runtime.evaluate",
+                                json!({"expression": expr, "returnByValue": true}),
+                                cancel,
+                            )
+                            .await?;
+                        if res["result"]["value"].as_bool() == Some(true)
+                            || start.elapsed() >= Duration::from_millis(ms)
+                        {
+                            break;
+                        }
+                        tokio::select! { _ = cancel.cancelled() => bail!("Cancelled"), _ = tokio::time::sleep(Duration::from_millis(150)) => {} }
+                    }
+                } else {
+                    tokio::select! { _ = cancel.cancelled() => bail!("Cancelled"), _ = tokio::time::sleep(Duration::from_millis(ms)) => {} }
+                }
+                self.observe(cancel).await
+            }
+            "eval" => {
+                let expr = action
+                    .text
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .context("eval requires JS expression in text")?;
+                let res = match self
+                    .rpc(
+                        "Runtime.evaluate",
+                        json!({"expression": expr, "returnByValue": true, "awaitPromise": true}),
+                        cancel,
+                    )
+                    .await
+                {
+                    Ok(v) => v,
+                    Err(err) => {
+                        let msg = err.to_string();
+                        if msg.contains("-32000") || msg.contains("Execution context") {
+                            tokio::select! { _ = cancel.cancelled() => bail!("Cancelled"), _ = tokio::time::sleep(Duration::from_millis(600)) => {} }
+                            let location = self.location(cancel).await.unwrap_or(Value::Null);
+                            return output(json!({
+                                "ok": true,
+                                "action": "eval",
+                                "target": "browser",
+                                "navigated": true,
+                                "page": location,
+                                "note": "JS triggered page navigation (execution context changed); call observe to inspect the new page."
+                            }));
+                        }
+                        return Err(err);
+                    }
+                };
+                if let Some(desc) = res["exceptionDetails"]["exception"]["description"].as_str() {
+                    bail!("JS eval error: {}", clip(desc, 300));
+                }
+                let val = &res["result"]["value"];
+                let text = if let Some(s) = val.as_str() {
+                    clip(s, 12000)
+                } else {
+                    clip(&serde_json::to_string(val).unwrap_or_default(), 12000)
+                };
+                output(json!({"ok":true,"action":"eval","target":"browser","result":text}))
+            }
+            "cookies" => {
+                let res = self.rpc("Network.getCookies", json!({}), cancel).await?;
+                let cookies = res["cookies"].as_array().cloned().unwrap_or_default();
+                let mut by_domain: std::collections::BTreeMap<String, Vec<String>> =
+                    std::collections::BTreeMap::new();
+                for c in &cookies {
+                    let domain = c["domain"].as_str().unwrap_or("").to_string();
+                    let name = c["name"].as_str().unwrap_or("").to_string();
+                    if !domain.is_empty() && !name.is_empty() {
+                        by_domain.entry(domain).or_default().push(name);
+                    }
+                }
+                output(json!({
+                    "ok": true,
+                    "action": "cookies",
+                    "count": cookies.len(),
+                    "domains": by_domain,
+                    "note": "Cookie values are withheld for security; presence confirms login state."
+                }))
+            }
             _ => bail!("Unsupported browser action"),
         }
     }
@@ -1022,7 +1455,7 @@ impl BrowserSession {
             }
         }
         let snapshot = uuid::Uuid::new_v4().to_string();
-        let reply = self.rpc("Runtime.evaluate",json!({"expression":COLLECT_NODES,"objectGroup":"justai-observe","returnByValue":false}),cancel).await?;
+        let reply = self.rpc("Runtime.evaluate",json!({"expression":COLLECT_NODES,"objectGroup":"celoom-observe","returnByValue":false}),cancel).await?;
         ensure!(
             reply.get("exceptionDetails").is_none(),
             "DOM snapshot failed"
@@ -1096,7 +1529,7 @@ impl BrowserSession {
         let _ = self
             .rpc(
                 "Runtime.releaseObjectGroup",
-                json!({"objectGroup":"justai-observe"}),
+                json!({"objectGroup":"celoom-observe"}),
                 cancel,
             )
             .await;
@@ -1144,14 +1577,14 @@ impl BrowserSession {
         ensure!(reference.epoch == self.epoch, "STALE_REF: document changed");
         self.rpc(
             "Runtime.releaseObjectGroup",
-            json!({"objectGroup":"justai-action"}),
+            json!({"objectGroup":"celoom-action"}),
             cancel,
         )
         .await?;
         let reply = self
             .rpc(
                 "DOM.resolveNode",
-                json!({"backendNodeId":reference.backend,"objectGroup":"justai-action"}),
+                json!({"backendNodeId":reference.backend,"objectGroup":"celoom-action"}),
                 cancel,
             )
             .await
@@ -1399,8 +1832,8 @@ fn parse_key(value: &str) -> Result<KeySpec> {
         text: if modifiers & 7 == 0 { text } else { None },
     })
 }
-const INSTALL_REVISION: &str = r#"(()=>{if(!globalThis.__justai_dom_revision){let state={version:0};new MutationObserver(()=>state.version++).observe(document,{subtree:true,childList:true,attributes:true,characterData:true});Object.defineProperty(globalThis,'__justai_dom_revision',{value:state,configurable:false,enumerable:false})}return true})()"#;
-const SCREENSHOT_STAMP: &str = r#"({url:location.href,revision:globalThis.__justai_dom_revision?.version??-1,scroll_x:scrollX,scroll_y:scrollY,width:innerWidth,height:innerHeight,dpr:devicePixelRatio})"#;
+const INSTALL_REVISION: &str = r#"(()=>{if(!globalThis.__celoom_dom_revision){let state={version:0};new MutationObserver(()=>state.version++).observe(document,{subtree:true,childList:true,attributes:true,characterData:true});Object.defineProperty(globalThis,'__celoom_dom_revision',{value:state,configurable:false,enumerable:false})}return true})()"#;
+const SCREENSHOT_STAMP: &str = r#"({url:location.href,revision:globalThis.__celoom_dom_revision?.version??-1,scroll_x:scrollX,scroll_y:scrollY,width:innerWidth,height:innerHeight,dpr:devicePixelRatio})"#;
 const COLLECT_NODES: &str = r#"(()=>{let out=[];function scan(root){for(const e of root.querySelectorAll('*')){if(out.length>=120)return;const s=getComputedStyle(e),r=e.getBoundingClientRect();if(s.display==='none'||s.visibility!=='visible'||r.width<=0||r.height<=0||e.tagName==='INPUT'&&e.type==='hidden')continue;if(e.matches('a,button,input,textarea,select,summary,[role],[contenteditable],[tabindex],label,h1,h2,h3,h4')||e.onclick)out.push(e);if(e.shadowRoot)scan(e.shadowRoot)}}scan(document);return out})()"#;
 const METADATA: &str = r#"function(){const e=this,r=e.getBoundingClientRect(),s=getComputedStyle(e),t=(e.getAttribute('type')||'').toLowerCase(),tag=e.tagName.toLowerCase(),editable=e.isContentEditable||tag==='input'||tag==='textarea';const label=(e.getAttribute('aria-label')||Array.from(e.labels||[]).map(x=>x.innerText).join(' ')||e.getAttribute('title')||'').slice(0,160);return {tag,input_type:t,label,role:e.getAttribute('role')||'',name:label,identity_text:editable?'':(e.innerText||'').slice(0,160),text:(e.innerText||'').slice(0,160),value:t==='password'||t==='hidden'?null:('value'in e?String(e.value).slice(0,200):null),disabled:!!e.disabled||e.getAttribute('aria-disabled')==='true',readonly:!!e.readOnly,connected:e.isConnected,main_document:e.ownerDocument===document,visible:s.display!=='none'&&s.visibility==='visible'&&r.width>0&&r.height>0,rect:{x:r.x,y:r.y,width:r.width,height:r.height}}}"#;
 const PREPARE_FILL: &str = r#"function(){const e=this,t=(e.type||'').toLowerCase();if(e.disabled||e.readOnly||!e.isConnected||!(e.isContentEditable||e.tagName==='TEXTAREA'||e.tagName==='INPUT'&&['text','search','email','url','tel','password','number',''].includes(t)))return false;e.focus();if(e.isContentEditable){let r=document.createRange();r.selectNodeContents(e);let s=getSelection();s.removeAllRanges();s.addRange(r)}else{e.select()}return true}"#;

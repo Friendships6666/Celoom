@@ -10,7 +10,7 @@ export interface OutboxEntry {
   // Acceptance alone does not acknowledge an upgrade of an older in-flight payload.
   escalation_pending?: boolean; accepted?: boolean; escalation_attempts?: number; interruption_only?: boolean;
 }
-const DB_NAME = 'justai-message-outbox';
+const DB_NAME = 'celoom-message-outbox';
 const STORE = 'messages';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const outboxKey = (origin: string, session: string, id: string) => `${origin}\0${session}\0${id}`;

@@ -43,7 +43,7 @@ test('quality checks preview low-cost plan then start once, poll, cancel and reo
   let current: any = null; let posts = 0; let polls = 0; let cancels = 0; let exports = 0; const plans: any[] = []; const queries: string[] = [];
   await page.route('**/api/model-checks**', async route => {
     const url = new URL(route.request().url()); const path = url.pathname;
-    if (path.endsWith('/plan')) { const input = route.request().postDataJSON(); plans.push(input); expect(route.request().headers()['x-justai-request']).toBe('1'); return route.fulfill({ json: plan(input) }); }
+    if (path.endsWith('/plan')) { const input = route.request().postDataJSON(); plans.push(input); expect(route.request().headers()['x-celoom-request']).toBe('1'); return route.fulfill({ json: plan(input) }); }
     if (path.endsWith('/cancel')) { cancels++; current = { ...current, status: 'cancelled', updated_at: '2026-11-16T12:00:03Z' }; return route.fulfill({ json: current }); }
     if (path.endsWith('/export')) { exports++; return route.fulfill({ json: current }); }
     if (path === '/api/model-checks') {

@@ -319,7 +319,7 @@ impl CacheAudit {
 
     fn mac(&self, domain: &str) -> HmacSha256 {
         let mut mac = HmacSha256::new_from_slice(&self.inner.key).expect("32-byte HMAC key");
-        mac.update(b"JustAIAgent.cache_audit.v1\0");
+        mac.update(b"Celoom.cache_audit.v1\0");
         mac.update(&(domain.len() as u64).to_be_bytes());
         mac.update(domain.as_bytes());
         mac

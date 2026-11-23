@@ -1,4 +1,4 @@
-export interface Bootstrap { initialized: boolean; authenticated: boolean; allow_setup: boolean; version: string; workspace?: string }
+export interface Bootstrap { initialized: boolean; authenticated: boolean; allow_setup: boolean; version: string; workspace?: string; data_dir?: string }
 export interface ModelConfig {
   id: string; name: string; model: string; supports_images: boolean;
   max_output_tokens: number; context_window: number; reasoning_efforts: string[];
@@ -71,3 +71,31 @@ export function modelOptions(config?: AppConfig | null): ModelOption[] {
 }
 export const selectionValue = (s: Selection) => JSON.stringify([s.site_id, s.key_id, s.model_id]);
 export const sameSelection = (a: Selection, b: Selection) => selectionValue(a) === selectionValue(b);
+
+export interface RuntimeItem {
+  id: string;
+  name: string;
+  running: boolean;
+  status: string;
+  detail?: string;
+  parent_id?: string;
+  is_current?: boolean;
+  is_current_session?: boolean;
+}
+export interface RuntimeJobItem {
+  id: string;
+  owner: string;
+  status: string;
+  running: boolean;
+  exit_code?: number | null;
+  bytes: number;
+  privilege: string;
+}
+export interface RuntimeOverview {
+  services: RuntimeItem[];
+  processes: RuntimeItem[];
+  jobs: RuntimeJobItem[];
+  session_tasks: RuntimeItem[];
+  subagents: RuntimeItem[];
+  last_cancelled_subagents?: string[];
+}

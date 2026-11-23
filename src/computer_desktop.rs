@@ -157,7 +157,7 @@ impl Drop for Session {
             && self
                 .root
                 .file_name()
-                .is_some_and(|n| n.to_string_lossy().starts_with("justai-desktop-"))
+                .is_some_and(|n| n.to_string_lossy().starts_with("celoom-desktop-"))
         {
             let _ = std::fs::remove_dir_all(&self.root);
         }
@@ -456,7 +456,7 @@ impl Session {
         let python =
             binary("python3").context("Install Python 3 and GI Atspi for native accessibility")?;
         let id = uuid::Uuid::new_v4().simple().to_string();
-        let root = PathBuf::from(format!("/tmp/justai-desktop-{id}"));
+        let root = PathBuf::from(format!("/tmp/celoom-desktop-{id}"));
         std::fs::DirBuilder::new().mode(0o700).create(&root)?;
         let mut cleanup = StartupRoot {
             path: root.clone(),
@@ -477,7 +477,7 @@ impl Session {
         dbus: PathBuf,
         python: PathBuf,
     ) -> Result<Self> {
-        let display = format!("justai-{id}");
+        let display = format!("celoom-{id}");
         for sub in ["home", "config", "cache", "data"] {
             std::fs::DirBuilder::new()
                 .mode(0o700)
@@ -843,7 +843,7 @@ impl Session {
 }
 async fn capture_workspace(bus: &zbus::Connection) -> Result<ComputerImage> {
     let fd = nix::sys::memfd::memfd_create(
-        "justai-private-capture",
+        "celoom-private-capture",
         nix::sys::memfd::MFdFlags::MFD_CLOEXEC,
     )?;
     let mut file = File::from(fd);
@@ -1285,7 +1285,7 @@ fn send_input_scoped(
         host || socket
             .parent()
             .and_then(Path::file_name)
-            .is_some_and(|s| s.to_string_lossy().starts_with("justai-desktop-")),
+            .is_some_and(|s| s.to_string_lossy().starts_with("celoom-desktop-")),
         "Input must use private runtime socket"
     );
     let stream = UnixStream::connect(socket).context("Connect private Wayland input")?;
@@ -1312,7 +1312,7 @@ fn send_input_scoped(
         .as_ref()
         .context("Private KWin does not expose fake_input v4")?;
     fake.authenticate(
-        "JustAI private desktop".into(),
+        "Celoom private desktop".into(),
         "Input exclusively inside self-owned virtual compositor".into(),
     );
     ensure!(

@@ -221,6 +221,30 @@ pre, code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospac
 .markdown th, .markdown td { padding: 8px 12px; border: 1px solid var(--line); white-space: normal; min-width: 85px; }.markdown th { background: var(--surface-2); }
 .markdown hr { border: 0; border-top: 1px solid var(--line); margin: 22px 0; }
 .external-image { font-size: 11px; color: var(--muted); }
+.markdown .katex-display { overflow-x: auto; overflow-y: hidden; padding: 6px 0; margin: 14px 0; }
+.code-block { margin: 16px 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface-2); }
+.code-block pre { margin: 0; border: 0; border-radius: 0; background: transparent; }
+.code-block-bar { display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 60%, var(--surface-2)); font-size: 10px; color: var(--muted); }
+.code-lang { text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.code-block-actions { display: flex; align-items: center; gap: 6px; }
+.code-action-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 10px; cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+.code-action-btn:hover, .code-action-btn.active { color: var(--text); border-color: var(--line-strong); background: var(--surface-2); }
+.html-preview-frame { display: block; width: 100%; height: 360px; min-height: 180px; resize: vertical; border: 0; background: #ffffff; }
+.thinking-panel { margin: 2px 0 14px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--surface-2) 70%, transparent); overflow: hidden; }
+.thinking-panel summary { list-style: none; display: flex; align-items: center; gap: 7px; padding: 9px 12px; cursor: pointer; font-size: 11px; color: var(--muted); user-select: none; }
+.thinking-panel summary .chevron { margin-left: auto; transition: transform .18s ease; }
+.thinking-panel[open] summary .chevron { transform: rotate(90deg); }
+.thinking-body { padding: 10px 14px 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); line-height: 1.75; }
+.thinking-body .markdown { font-size: 12px; line-height: 1.75; }
+.generating-placeholder { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-radius: 9px; background: var(--surface-2); border: 1px dashed var(--line-strong); color: var(--muted); font-size: 12px; }
+.generating-dots { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; }
+.generating-dots i { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); opacity: .35; animation: gen-dot 1.2s infinite ease-in-out; }
+.generating-dots i:nth-child(2) { animation-delay: .2s; }
+.generating-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes gen-dot { 0%, 80%, 100% { opacity: .25; transform: scale(.85); } 40% { opacity: 1; transform: scale(1.15); } }
+.assistant-actions { display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--line) 65%, transparent); }
+.copy-btn { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font-size: 11px; cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+.copy-btn:hover { color: var(--text); border-color: var(--line-strong); background: var(--surface); }
 .text-cursor { display: inline-block; height: 14px; width: 3px; background: var(--accent); border-radius: 2px; margin-left: 4px; animation: pulse 1s infinite; }
 .attempt-failure { display: flex; align-items: flex-start; gap: 6px; color: var(--warning); font-size: 10px; margin-top: 10px; }
 .failed-attempt { opacity: .7; }

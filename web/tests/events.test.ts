@@ -24,6 +24,20 @@ describe('session routing and file event contracts', () => {
     expect(assistantLabel(undefined, { site: { name: 'Current site' }, model: { name: 'Current model', model: 'current' } })).toBe('Current site - Current model');
     expect(assistantLabel()).not.toContain('Celoom');
   });
+  it('streams and commits optional assistant reasoning separately from answer text', () => {
+    const streaming = timeline([
+      event(1, 'assistant_reasoning_delta', { attempt_id: 'r1', text: 'step 1' }),
+      event(2, 'assistant_reasoning_delta', { attempt_id: 'r1', text: ' -> step 2' }),
+    ]);
+    expect(streaming).toHaveLength(1);
+    expect(streaming[0]).toMatchObject({ kind: 'assistant', text: '', reasoning: 'step 1 -> step 2', provisional: true });
+
+    const committed = timeline([
+      event(1, 'assistant_reasoning_delta', { attempt_id: 'r1', text: 'partial' }),
+      event(2, 'assistant_message', { attempt_id: 'r1', text: 'Final answer', reasoning: 'Full thought' }),
+    ]);
+    expect(committed[0]).toMatchObject({ kind: 'assistant', text: 'Final answer', reasoning: 'Full thought', provisional: false });
+  });
   it('keeps actual files at every round end including empty rounds and rejects unsafe paths', () => {
     const result = timeline([event(1, 'user_message', { text: 'first' }), event(2, 'assistant_message', { attempt_id: 'a', text: 'done' }), event(3, 'turn_files', { run_id: 'first', files: [{ path: 'site/index.html', name: 'index.html', kind: 'new' }, { path: '../secret', name: 'secret', kind: 'new' }] }), event(4, 'user_message', { text: 'second' }), event(5, 'turn_files', { run_id: 'second', files: [] })]);
     expect(result.map(item => item.kind)).toEqual(['user', 'assistant', 'files', 'user', 'files']);

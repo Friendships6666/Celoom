@@ -745,19 +745,20 @@ impl Store {
         attempt_id: &str,
         items: Vec<Value>,
         text: &str,
+        reasoning: &str,
     ) -> Result<()> {
         let id = id.to_owned();
         let attempt_id = attempt_id.to_owned();
         let text = text.to_owned();
+        let reasoning = reasoning.to_owned();
         self.call(move |db| {
             let tx = db.transaction()?;
             context_items(&tx, &id, items)?;
-            event(
-                &tx,
-                &id,
-                "assistant_message",
-                json!({"attempt_id":attempt_id,"id":new_id(),"text":text}),
-            )?;
+            let mut payload = json!({"attempt_id":attempt_id,"id":new_id(),"text":text});
+            if !reasoning.is_empty() {
+                payload["reasoning"] = json!(reasoning);
+            }
+            event(&tx, &id, "assistant_message", payload)?;
             tx.commit()?;
             Ok(())
         })

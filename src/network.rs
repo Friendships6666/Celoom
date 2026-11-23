@@ -556,9 +556,16 @@ fn transport_failure(message: impl Into<String>) -> GenerationError {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StreamDelta {
+    Text(String),
+    Reasoning(String),
+}
+
 pub struct Generated {
     pub items: Vec<Value>,
     pub text: String,
+    pub reasoning_text: String,
     pub input_tokens: u64,
     pub output_tokens: u64,
     pub usage: Value,
@@ -783,10 +790,11 @@ pub(crate) struct Assembly {
     done: BTreeMap<usize, bool>,
     arguments: BTreeMap<usize, String>,
     reasoning_delta_bytes: usize,
+    streamed_reasoning: String,
     terminal: Option<Value>,
 }
 impl Assembly {
-    pub(crate) fn event(&mut self, event: Value) -> Result<Option<String>> {
+    pub(crate) fn event(&mut self, event: Value) -> Result<Option<StreamDelta>> {
         let kind = event["type"].as_str().context("SSE event missing type")?;
         match kind {
             "response.output_item.added" | "response.output_item.done" => {
@@ -861,18 +869,22 @@ impl Assembly {
                 if let Some(text) = event["delta"].as_str() {
                     self.reasoning_delta_bytes =
                         self.reasoning_delta_bytes.saturating_add(text.len());
+                    if !text.is_empty() {
+                        self.streamed_reasoning.push_str(text);
+                        return Ok(Some(StreamDelta::Reasoning(text.to_owned())));
+                    }
                 }
             }
             "response.output_text.delta" => {
                 event["output_index"]
                     .as_u64()
                     .context("Text output index missing")?;
-                return Ok(Some(
+                return Ok(Some(StreamDelta::Text(
                     event["delta"]
                         .as_str()
                         .context("Text delta missing")?
                         .to_owned(),
-                ));
+                )));
             }
             "response.completed" => {
                 if self.terminal.is_some() {
@@ -944,6 +956,7 @@ impl Assembly {
             .count();
         let mut ids = std::collections::HashSet::new();
         let mut text = String::new();
+        let mut reasoning_text = String::new();
         for (index, item) in items.iter().enumerate() {
             match item["type"].as_str().context("Unknown output item")? {
                 "function_call" => {
@@ -989,9 +1002,39 @@ impl Assembly {
                         }
                     }
                 }
-                "reasoning" => {}
+                "reasoning" => {
+                    let mut item_reasoning = String::new();
+                    if let Some(parts) = item["content"].as_array() {
+                        for part in parts {
+                            if let Some(t) = part["text"].as_str() {
+                                item_reasoning.push_str(t);
+                            }
+                        }
+                    }
+                    if item_reasoning.is_empty()
+                        && let Some(parts) = item["summary"].as_array()
+                    {
+                        for part in parts {
+                            if let Some(t) = part["text"].as_str() {
+                                if !item_reasoning.is_empty() && !t.is_empty() {
+                                    item_reasoning.push_str("\n\n");
+                                }
+                                item_reasoning.push_str(t);
+                            }
+                        }
+                    }
+                    if !item_reasoning.is_empty() {
+                        if !reasoning_text.is_empty() {
+                            reasoning_text.push_str("\n\n");
+                        }
+                        reasoning_text.push_str(&item_reasoning);
+                    }
+                }
                 _ => bail!("Unsupported Responses output type"),
             }
+        }
+        if reasoning_text.is_empty() && !self.streamed_reasoning.is_empty() {
+            reasoning_text = self.streamed_reasoning;
         }
         let final_reasoning_shape = reasoning_shape(&items);
         let stream_reasoning_shape =
@@ -999,6 +1042,7 @@ impl Assembly {
         Ok(Generated {
             items,
             text,
+            reasoning_text,
             input_tokens: response["usage"]["input_tokens"].as_u64().unwrap_or(0),
             output_tokens: response["usage"]["output_tokens"].as_u64().unwrap_or(0),
             usage: numeric_usage(&response["usage"]),
@@ -1075,7 +1119,7 @@ pub async fn generate(
     snapshot: &Snapshot,
     body: Value,
     cancel: CancellationToken,
-    deltas: Option<mpsc::Sender<String>>,
+    deltas: Option<mpsc::Sender<StreamDelta>>,
 ) -> std::result::Result<Generated, GenerationError> {
     let operation = async {
         let client = snapshot

@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type FormEvent, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowDown, ArrowUp, Check, ChevronRight, CircleAlert, CircleHelp, FolderOpen, GitBranch, Globe2, Image as ImageIcon, ImagePlus, LoaderCircle, Minimize2, Monitor, Search, Square, Target, Terminal, Workflow, X, Zap } from 'lucide-react';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import { ArrowDown, ArrowUp, Brain, Check, ChevronRight, CircleAlert, CircleHelp, Code2, Copy, Eye, FolderOpen, GitBranch, Globe2, Image as ImageIcon, ImagePlus, LoaderCircle, Minimize2, Monitor, Search, Square, Target, Terminal, Workflow, X, Zap } from 'lucide-react';
 import { api, errorMessage } from './api';
 import { assistantLabel, subagentLabel, timeline, toolSummary, type TimelineItem } from './events';
 import { LogoMark } from './Logo';
@@ -18,8 +21,143 @@ import { imageMimes, MAX_IMAGES, MAX_IMAGE_BYTES, pastedFiles, pastedImages, rea
 import { attachmentUrl as renderImage, ImageLightbox } from './ImageLightbox';
 import { useOutbox } from './useOutbox';
 import { failureLabels } from './outbox';
+async function copyText(value: string): Promise<boolean> {
+  if (!value) return false;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {
+    // Fallback below when clipboard API is blocked or unavailable.
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  return ok;
+}
+
+function CopyButton({ text, label = '复制', className = 'copy-btn' }: { text: string; label?: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={() => {
+        void copyText(text).then((ok) => {
+          if (ok) setCopied(true);
+        });
+      }}
+      title={copied ? '已复制' : label}
+      aria-label={copied ? '已复制' : label}
+    >
+      {copied ? <Check size={13} /> : <Copy size={13} />}
+      <span>{copied ? '已复制' : label}</span>
+    </button>
+  );
+}
+
+function normalizeLatexDelimiters(input: string): string {
+  // Convert \[...\] and \(...\) into $$...$$ and $...$ outside code fences and inline code.
+  const segments = input.split(/(```[\s\S]*?```|`[^`\n]+`)/g);
+  return segments
+    .map((segment, idx) => {
+      if (idx % 2 === 1) return segment;
+      return segment
+        .replace(/\\\[([\s\S]+?)\\\]/g, (_m, expr: string) => `\n$$\n${expr.trim()}\n$$\n`)
+        .replace(/\\\((.+?)\\\)/g, (_m, expr: string) => `$${expr.trim()}$`);
+    })
+    .join('');
+}
+
+function extractCodeText(node: ReactNode): string {
+  if (typeof node === 'string') return node;
+  if (typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractCodeText).join('');
+  if (node && typeof node === 'object' && 'props' in node) {
+    const props = (node as { props?: { children?: ReactNode } }).props;
+    return extractCodeText(props?.children);
+  }
+  return '';
+}
+
+function CodeBlock({ className, children }: { className?: string; children: ReactNode }) {
+  const match = /language-([^\s]+)/.exec(className ?? '');
+  const lang = (match?.[1] ?? '').toLowerCase();
+  const code = extractCodeText(children).replace(/\n$/, '');
+  const isHtml = lang === 'html' || lang === 'htm';
+  const isSvg = lang === 'svg';
+  const previewable = isHtml || isSvg;
+  const [preview, setPreview] = useState(false);
+  const srcDoc = isSvg
+    ? `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;display:grid;place-items:center;background:#fff;}</style></head><body>${code}</body></html>`
+    : code;
+  return (
+    <div className="code-block">
+      <div className="code-block-bar">
+        <span className="code-lang">{lang || 'code'}</span>
+        <div className="code-block-actions">
+          {previewable && (
+            <button
+              type="button"
+              className={`code-action-btn ${preview ? 'active' : ''}`}
+              onClick={() => setPreview((v) => !v)}
+            >
+              {preview ? <Code2 size={13} /> : <Eye size={13} />}
+              <span>{preview ? '源码' : '预览'}</span>
+            </button>
+          )}
+          <CopyButton text={code} className="code-action-btn" />
+        </div>
+      </div>
+      {preview && previewable ? (
+        <iframe
+          className="html-preview-frame"
+          sandbox="allow-scripts"
+          srcDoc={srcDoc}
+          title={`${lang.toUpperCase()} 预览`}
+        />
+      ) : (
+        <pre><code className={className}>{children}</code></pre>
+      )}
+    </div>
+  );
+}
+
 function Markdown({ text }: { text: string }) {
-  return <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{ a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>, img: ({ alt }) => <span className="external-image">[远程图片：{alt || '已阻止自动加载'}]</span> }}>{text}</ReactMarkdown>;
+  const normalized = useMemo(() => normalizeLatexDelimiters(text), [text]);
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeKatex]}
+      skipHtml
+      components={{
+        a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
+        img: ({ alt }) => <span className="external-image">[远程图片：{alt || '已阻止自动加载'}]</span>,
+        pre: ({ children }) => {
+          const child = Array.isArray(children) ? children[0] : children;
+          if (child && typeof child === 'object' && 'props' in child) {
+            const props = (child as { props?: { className?: string; children?: ReactNode } }).props;
+            return <CodeBlock className={props?.className}>{props?.children}</CodeBlock>;
+          }
+          return <pre>{children}</pre>;
+        },
+      }}
+    >
+      {normalized}
+    </ReactMarkdown>
+  );
 }
 function timeLabel(time: string) { const date = new Date(time); return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 function ToolCard({ item, running }: { item: Extract<TimelineItem, { kind: 'tool' }>; running: boolean }) {
@@ -33,12 +171,56 @@ function TimelineEntry({ item, running, onOpenSession, onPreview, model, session
     const attachments = item.images.filter(image => !!renderImage(image));
     return <article className="message user-message"><div className="message-meta"><span>你</span><time>{timeLabel(item.time)}</time>{item.queued && <span className="queued-badge">{item.interrupted || item.deliveryMode === 'immediate' ? '已排队 · 强制介入' : '已排队 · 等待交付'}</span>}</div>{attachments.length > 0 && <div className="message-images">{attachments.map((image, i) => <button type="button" className="message-image-button" key={i} aria-label={`查看附件 ${i + 1}`} onClick={() => onPreview(attachments, i)}><img src={renderImage(image)} alt={`图片附件 ${i + 1}`} loading="lazy" /></button>)}</div>}{item.text && <div className="user-text">{item.text}</div>}</article>;
   }
-  if (item.kind === 'assistant' && !item.text && !item.provisional && !item.failed) return null;
+  if (item.kind === 'assistant' && !item.text && !item.reasoning && !item.provisional && !item.failed) return null;
   if (item.kind === 'assistant') {
     const thinking = item.provisional && running && !item.text;
     const accent = brandAccent(detectModelBrand(item.source?.model_name, item.source?.model, model?.model.name, model?.model.model));
     const style = thinking ? { '--think-primary': accent.primary, '--think-secondary': accent.secondary, '--think-tertiary': accent.tertiary } as React.CSSProperties : undefined;
-    return <article className={`message assistant-message ${item.failed ? 'failed-attempt' : ''} ${thinking ? 'is-thinking' : ''}`} style={style}><div className="message-meta"><ModelAvatar names={[item.source?.model_name, item.source?.model, model?.model.name, model?.model.model]} /><span className="assistant-source" title={item.source ? [item.source.model, item.source.reasoning_effort].filter(Boolean).join(' · ') : '旧消息未记录来源，显示当前会话模型'}>{assistantLabel(item.source, model)}</span><time>{timeLabel(item.time)}</time>{item.provisional && <span className="live-mark">{running ? (item.text ? '生成中' : '思考中') : '未完成'}</span>}</div><div className="markdown"><Markdown text={item.text} />{item.provisional && running && <span className="text-cursor" />}</div>{item.failed && <div className="attempt-failure"><CircleAlert size={14} />此尝试未完成：{item.failed}</div>}</article>;
+    const hasReasoning = Boolean(item.reasoning && item.reasoning.trim());
+    const hasText = Boolean(item.text);
+    return (
+      <article className={`message assistant-message ${item.failed ? 'failed-attempt' : ''} ${thinking ? 'is-thinking' : ''}`} style={style}>
+        <div className="message-meta">
+          <ModelAvatar names={[item.source?.model_name, item.source?.model, model?.model.name, model?.model.model]} />
+          <span className="assistant-source" title={item.source ? [item.source.model, item.source.reasoning_effort].filter(Boolean).join(' · ') : '旧消息未记录来源，显示当前会话模型'}>{assistantLabel(item.source, model)}</span>
+          <time>{timeLabel(item.time)}</time>
+          {item.provisional && <span className="live-mark">{running ? (hasText ? '生成中' : '思考中') : '未完成'}</span>}
+        </div>
+        {hasReasoning && (
+          <details className="thinking-panel" open={thinking}>
+            <summary>
+              <Brain size={14} />
+              <span>{thinking ? '正在深度思考…' : '思考过程'}</span>
+              <ChevronRight className="chevron" size={14} />
+            </summary>
+            <div className="thinking-body">
+              <Markdown text={item.reasoning ?? ''} />
+              {thinking && <span className="text-cursor" />}
+            </div>
+          </details>
+        )}
+        {hasText ? (
+          <div className="markdown">
+            <Markdown text={item.text} />
+            {item.provisional && running && <span className="text-cursor" />}
+          </div>
+        ) : (
+          item.provisional && running && (
+            <div className="generating-placeholder">
+              <LoaderCircle className="spin" size={14} />
+              <span>{hasReasoning ? '正在组织回复内容…' : '正在思考并生成回复…'}</span>
+              <span className="generating-dots"><i /><i /><i /></span>
+            </div>
+          )
+        )}
+        {hasText && !item.provisional && (
+          <div className="assistant-actions">
+            <CopyButton text={item.text} label="复制回答" />
+          </div>
+        )}
+        {item.failed && <div className="attempt-failure"><CircleAlert size={14} />此尝试未完成：{item.failed}</div>}
+      </article>
+    );
   }
   if (item.kind === 'tool') return <ToolCard item={item} running={running} />;
   if (item.kind === 'files') return <TurnFilesCard files={item.files} sessionId={sessionId} />;

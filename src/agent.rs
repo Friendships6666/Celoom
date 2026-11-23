@@ -1141,6 +1141,7 @@ impl Engine {
             );
             tokio::pin!(operation);
             let mut pending = String::new();
+            let mut pending_reasoning = String::new();
             let mut ticker = tokio::time::interval(Duration::from_millis(50));
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             let generated = loop {
@@ -1148,23 +1149,32 @@ impl Engine {
                     _=interrupt.cancelled(),if !compact=>break Err(network::GenerationError{message:"INBOX_INTERRUPT".into(),retryable:false,retry_after_ms:None,transport_failure:false}),
                     result = &mut operation => break result,
                     Some(delta) = receiver.recv() => {
-                        pending.push_str(&delta);
-                        if pending.len() >= 1024 { flush_delta(&self.inner.store, &session.id, &attempt_id, &snapshot, &mut pending).await?; }
+                        match delta {
+                            network::StreamDelta::Text(text) => pending.push_str(&text),
+                            network::StreamDelta::Reasoning(text) => pending_reasoning.push_str(&text),
+                        }
+                        if pending.len() >= 1024 || pending_reasoning.len() >= 1024 {
+                            flush_deltas(&self.inner.store, &session.id, &attempt_id, &snapshot, &mut pending, &mut pending_reasoning).await?;
+                        }
                     },
-                    _ = ticker.tick(), if !pending.is_empty() => {
-                        flush_delta(&self.inner.store, &session.id, &attempt_id, &snapshot, &mut pending).await?;
+                    _ = ticker.tick(), if !pending.is_empty() || !pending_reasoning.is_empty() => {
+                        flush_deltas(&self.inner.store, &session.id, &attempt_id, &snapshot, &mut pending, &mut pending_reasoning).await?;
                     }
                 }
             };
             while let Ok(delta) = receiver.try_recv() {
-                pending.push_str(&delta);
+                match delta {
+                    network::StreamDelta::Text(text) => pending.push_str(&text),
+                    network::StreamDelta::Reasoning(text) => pending_reasoning.push_str(&text),
+                }
             }
-            flush_delta(
+            flush_deltas(
                 &self.inner.store,
                 &session.id,
                 &attempt_id,
                 &snapshot,
                 &mut pending,
+                &mut pending_reasoning,
             )
             .await?;
             match generated {
@@ -1356,6 +1366,7 @@ impl Engine {
                     &attempt_id,
                     generated.items.clone(),
                     &generated.text,
+                    &request_snapshot.redact(&generated.reasoning_text),
                 )
                 .await?;
             let audit = self.audit().await?;
@@ -2586,15 +2597,26 @@ fn utf8_chunks(text: &str, max_bytes: usize) -> Vec<&str> {
     chunks
 }
 
-async fn flush_delta(
+async fn flush_deltas(
     store: &Store,
     id: &str,
     attempt_id: &str,
     snapshot: &Snapshot,
-    pending: &mut String,
+    pending_text: &mut String,
+    pending_reasoning: &mut String,
 ) -> Result<()> {
-    if !pending.is_empty() {
-        let text = snapshot.redact(&std::mem::take(pending));
+    if !pending_reasoning.is_empty() {
+        let text = snapshot.redact(&std::mem::take(pending_reasoning));
+        store
+            .append_event(
+                id,
+                "assistant_reasoning_delta",
+                json!({"attempt_id":attempt_id,"text":text}),
+            )
+            .await?;
+    }
+    if !pending_text.is_empty() {
+        let text = snapshot.redact(&std::mem::take(pending_text));
         store
             .append_event(
                 id,

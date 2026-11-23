@@ -3,7 +3,7 @@ import { computerActivity, safeComputerText } from './computer';
 
 export type TimelineItem =
   | { kind: 'user'; key: string; text: string; images: ImageInput[]; time: string; clientId?: string; queued?: boolean; deliveryMode?: DeliveryMode; interrupted?: boolean }
-  | { kind: 'assistant'; key: string; text: string; provisional: boolean; source?: AssistantSource; failed?: string; time: string }
+  | { kind: 'assistant'; key: string; text: string; reasoning?: string; provisional: boolean; source?: AssistantSource; failed?: string; time: string }
   | { kind: 'tool'; key: string; sessionId: string; name: string; args: unknown; output?: string; capture?: ComputerActivity; error: boolean; finished: boolean; time: string }
   | { kind: 'subagent'; key: string; id: string; task: string; status: string; source?: SubagentSource; time: string }
   | { kind: 'files'; key: string; runId: string; files: TurnFile[]; time: string }
@@ -78,6 +78,7 @@ export function timeline(events: AgentEvent[]): TimelineItem[] {
         if (clientId) users.set(identity, item); items.push(item); break;
       }
       case 'assistant_source':
+      case 'assistant_reasoning_delta':
       case 'assistant_delta':
       case 'assistant_message': {
         const id = str(d.attempt_id) || str(d.id) || key;
@@ -86,8 +87,13 @@ export function timeline(events: AgentEvent[]): TimelineItem[] {
         if (event.type === 'assistant_source') {
           // The first actual request source wins, even when route settings change later.
           item.source ??= { attempt_id: id, site_name: str(d.site_name), model_name: str(d.model_name), model: str(d.model), reasoning_effort: typeof d.reasoning_effort === 'string' ? d.reasoning_effort : null };
-        } else if (event.type === 'assistant_message') { item.text = str(d.text); item.provisional = false; }
-        else if (item.provisional) item.text += str(d.text);
+        } else if (event.type === 'assistant_message') {
+          item.text = str(d.text);
+          if (typeof d.reasoning === 'string' && d.reasoning) item.reasoning = d.reasoning;
+          item.provisional = false;
+        } else if (event.type === 'assistant_reasoning_delta') {
+          if (item.provisional) item.reasoning = (item.reasoning ?? '') + str(d.text);
+        } else if (item.provisional) item.text += str(d.text);
         break;
       }
       case 'attempt_failed': {

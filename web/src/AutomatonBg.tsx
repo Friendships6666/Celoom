@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 
+type AutomatonMode = 'idle' | 'thinking' | 'tooling' | 'swarm';
+
 interface AutomatonFrame {
   cols: number;
   rows: number;
   tick: number;
-  mode: 'idle' | 'thinking' | 'tooling' | 'swarm';
+  mode: AutomatonMode;
   active_sessions: number;
   active_tools: number;
   active_subagents: number;
@@ -14,56 +16,78 @@ interface AutomatonFrame {
   cells: string;
 }
 
-function build256Palette(theme: 'light' | 'dark'): string[] {
-  const lut = new Array<string>(256);
-  lut[0] = 'transparent';
+interface Rgb {
+  r: number;
+  g: number;
+  b: number;
+}
+
+interface ModePalette {
+  low: Rgb;
+  mid: Rgb;
+  high: Rgb;
+}
+
+const DARK_PALETTES: Record<AutomatonMode, ModePalette> = {
+  idle: { low: { r: 10, g: 52, b: 68 }, mid: { r: 18, g: 138, b: 148 }, high: { r: 72, g: 224, b: 220 } },
+  thinking: { low: { r: 34, g: 28, b: 92 }, mid: { r: 99, g: 102, b: 241 }, high: { r: 168, g: 130, b: 255 } },
+  tooling: { low: { r: 58, g: 38, b: 12 }, mid: { r: 217, g: 119, b: 6 }, high: { r: 52, g: 211, b: 153 } },
+  swarm: { low: { r: 72, g: 18, b: 62 }, mid: { r: 236, g: 72, b: 153 }, high: { r: 34, g: 211, b: 238 } },
+};
+
+const LIGHT_PALETTES: Record<AutomatonMode, ModePalette> = {
+  idle: { low: { r: 196, g: 226, b: 228 }, mid: { r: 20, g: 136, b: 144 }, high: { r: 13, g: 110, b: 122 } },
+  thinking: { low: { r: 214, g: 212, b: 246 }, mid: { r: 99, g: 102, b: 241 }, high: { r: 109, g: 40, b: 217 } },
+  tooling: { low: { r: 246, g: 222, b: 188 }, mid: { r: 217, g: 119, b: 6 }, high: { r: 16, g: 148, b: 108 } },
+  swarm: { low: { r: 246, g: 204, b: 228 }, mid: { r: 219, g: 39, b: 119 }, high: { r: 8, g: 145, b: 178 } },
+};
+
+function packRgba(r: number, g: number, b: number, a: number): number {
+  // Little-endian ABGR in Uint32Array -> RGBA bytes in ImageData.
+  return ((a & 255) << 24) | ((b & 255) << 16) | ((g & 255) << 8) | (r & 255);
+}
+
+function buildPaletteLut(palette: ModePalette, maxAlpha: number): Uint32Array {
+  const lut = new Uint32Array(256);
+  lut[0] = 0;
   for (let i = 1; i < 256; i++) {
     const t = i / 255;
-    if (theme === 'dark') {
-      // Rich 256-color bioluminescent spectrum sweeping 320 deg:
-      // emerald -> cyan -> sky -> indigo -> violet -> magenta -> coral-amber
-      const hue = (150 + t * 290) % 360;
-      const sat = 76 + Math.sin(t * Math.PI * 2) * 16;
-      const light = 42 + t * 28;
-      const alpha = 0.08 + Math.pow(t, 0.78) * 0.62;
-      lut[i] = `hsla(${hue.toFixed(1)}, ${sat.toFixed(0)}%, ${light.toFixed(0)}%, ${alpha.toFixed(3)})`;
-    } else {
-      // Rich 256-color botanical prism sweeping 300 deg:
-      // rose -> crimson -> coral -> amber -> sage-teal -> cobalt -> plum
-      const hue = (335 + t * 285) % 360;
-      const sat = 62 + Math.sin(t * Math.PI * 2) * 18;
-      const light = 66 - t * 22;
-      const alpha = 0.06 + Math.pow(t, 0.8) * 0.42;
-      lut[i] = `hsla(${hue.toFixed(1)}, ${sat.toFixed(0)}%, ${light.toFixed(0)}%, ${alpha.toFixed(3)})`;
-    }
+    const c = t < 0.5
+      ? {
+          r: palette.low.r + (palette.mid.r - palette.low.r) * (t * 2),
+          g: palette.low.g + (palette.mid.g - palette.low.g) * (t * 2),
+          b: palette.low.b + (palette.mid.b - palette.low.b) * (t * 2),
+        }
+      : {
+          r: palette.mid.r + (palette.high.r - palette.mid.r) * ((t - 0.5) * 2),
+          g: palette.mid.g + (palette.high.g - palette.mid.g) * ((t - 0.5) * 2),
+          b: palette.mid.b + (palette.high.b - palette.mid.b) * ((t - 0.5) * 2),
+        };
+    const alpha = Math.round((0.04 + Math.pow(t, 0.85) * maxAlpha) * 255);
+    lut[i] = packRgba(Math.round(c.r), Math.round(c.g), Math.round(c.b), alpha);
   }
   return lut;
 }
 
-const DARK_LUT = build256Palette('dark');
-const LIGHT_LUT = build256Palette('light');
+const DARK_LUTS: Record<AutomatonMode, Uint32Array> = {
+  idle: buildPaletteLut(DARK_PALETTES.idle, 0.42),
+  thinking: buildPaletteLut(DARK_PALETTES.thinking, 0.54),
+  tooling: buildPaletteLut(DARK_PALETTES.tooling, 0.58),
+  swarm: buildPaletteLut(DARK_PALETTES.swarm, 0.62),
+};
+
+const LIGHT_LUTS: Record<AutomatonMode, Uint32Array> = {
+  idle: buildPaletteLut(LIGHT_PALETTES.idle, 0.24),
+  thinking: buildPaletteLut(LIGHT_PALETTES.thinking, 0.30),
+  tooling: buildPaletteLut(LIGHT_PALETTES.tooling, 0.34),
+  swarm: buildPaletteLut(LIGHT_PALETTES.swarm, 0.36),
+};
 
 function hexNibble(code: number): number {
   if (code >= 48 && code <= 57) return code - 48;
   if (code >= 97 && code <= 102) return code - 87;
   if (code >= 65 && code <= 70) return code - 55;
   return 0;
-}
-
-function createGlowSprite(color: string): HTMLCanvasElement {
-  const off = document.createElement('canvas');
-  off.width = 48;
-  off.height = 48;
-  const octx = off.getContext('2d');
-  if (octx) {
-    const grad = octx.createRadialGradient(24, 24, 2, 24, 24, 24);
-    grad.addColorStop(0, color);
-    grad.addColorStop(0.5, color.replace(/[\d.]+\)$/, '0.18)'));
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    octx.fillStyle = grad;
-    octx.fillRect(0, 0, 48, 48);
-  }
-  return off;
 }
 
 export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark'; authenticated: boolean }) {
@@ -111,130 +135,94 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
+    const offCanvas = document.createElement('canvas');
+    const offCtx = offCanvas.getContext('2d');
+    if (!offCtx) return;
+
+    let imgData: ImageData | null = null;
+    let rgba32: Uint32Array | null = null;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    const darkGlow = createGlowSprite('rgba(86, 223, 223, 0.50)');
-    const lightGlow = createGlowSprite('rgba(168, 48, 82, 0.32)');
     let rafId = 0;
-    let width = 0;
-    let height = 0;
-    let dpr = 1;
     let lastDraw = 0;
 
     const resize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-      width = window.innerWidth;
-      height = window.innerHeight;
-      canvas.width = Math.max(1, Math.floor(width * dpr));
-      canvas.height = Math.max(1, Math.floor(height * dpr));
+      // Cap backing buffer at 960x540 so GPU bilinear upscaling stays fluid with minimal fillrate.
+      const aspect = window.innerHeight > 0 ? window.innerWidth / window.innerHeight : 16 / 9;
+      const w = Math.min(window.innerWidth, 960);
+      const h = Math.max(1, Math.round(w / Math.max(0.25, aspect)));
+      canvas.width = Math.max(1, w);
+      canvas.height = Math.max(1, h);
     };
     resize();
     window.addEventListener('resize', resize);
 
     const draw = (now: number) => {
+      if (document.hidden) {
+        rafId = 0;
+        return;
+      }
       const frame = frameRef.current;
-      const mode = frame?.mode ?? 'idle';
-      const minInterval = mode === 'idle' ? 40 : 28; // ~25fps idle, ~35fps active
+      const mode: AutomatonMode = frame?.mode ?? 'idle';
+      const minInterval = mode === 'idle' ? 45 : 32;
       if (!reducedMotion && now - lastDraw < minInterval) {
         rafId = window.requestAnimationFrame(draw);
         return;
       }
       lastDraw = now;
 
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, width, height);
-
-      const isDark = themeRef.current === 'dark';
-      const lut = isDark ? DARK_LUT : LIGHT_LUT;
-      const glowSprite = isDark ? darkGlow : lightGlow;
       const cols = frame?.cols ?? 28;
       const rows = frame?.rows ?? 16;
       const total = cols * rows;
-      const cellW = width / cols;
-      const cellH = height / rows;
-      const energy = frame?.energy ?? 0.1;
+
+      if (offCanvas.width !== cols || offCanvas.height !== rows || !imgData || !rgba32) {
+        offCanvas.width = cols;
+        offCanvas.height = rows;
+        imgData = offCtx.createImageData(cols, rows);
+        rgba32 = new Uint32Array(imgData.data.buffer);
+      }
 
       if (displayRef.current.length !== total) {
         displayRef.current = new Float32Array(total);
       }
       const target = decodedRef.current;
       const disp = displayRef.current;
-      const lerpRate = mode === 'idle' ? 0.20 : 0.34;
+      const lerpRate = mode === 'idle' ? 0.22 : 0.36;
       if (target.length === total) {
         for (let i = 0; i < total; i++) {
           disp[i] += (target[i] - disp[i]) * lerpRate;
         }
       }
 
-      // Subtle rhythmic grid mesh.
-      ctx.strokeStyle = isDark ? 'rgba(86, 223, 223, 0.045)' : 'rgba(136, 39, 63, 0.045)';
-      ctx.lineWidth = mode === 'swarm' || mode === 'tooling' ? 0.85 : 0.6;
-      ctx.globalAlpha = Math.min(1, 0.38 + energy * 0.72);
-      ctx.beginPath();
-      for (let x = 1; x < cols; x++) {
-        const px = Math.round(x * cellW) + 0.5;
-        ctx.moveTo(px, 0);
-        ctx.lineTo(px, height);
+      const lut = (themeRef.current === 'dark' ? DARK_LUTS : LIGHT_LUTS)[mode];
+      for (let i = 0; i < total; i++) {
+        const idx = Math.min(255, Math.max(0, Math.round(disp[i])));
+        rgba32[i] = idx <= 3 ? 0 : lut[idx];
       }
-      for (let y = 1; y < rows; y++) {
-        const py = Math.round(y * cellH) + 0.5;
-        ctx.moveTo(0, py);
-        ctx.lineTo(width, py);
-      }
-      ctx.stroke();
-      ctx.globalAlpha = 1;
 
-      const phaseShift = reducedMotion ? 0 : Math.floor((now * (mode === 'idle' ? 0.015 : 0.04)) % 255);
-      const padX = Math.max(1.5, cellW * 0.16);
-      const padY = Math.max(1.5, cellH * 0.16);
-      const baseW = Math.max(2, cellW - padX * 2);
-      const baseH = Math.max(2, cellH - padY * 2);
-
-      for (let y = 0; y < rows; y++) {
-        const rowOffset = y * cols;
-        for (let x = 0; x < cols; x++) {
-          const val = disp[rowOffset + x];
-          const rawIdx = Math.min(255, Math.round(val));
-          if (rawIdx <= 3) continue;
-
-          const t = rawIdx / 255;
-          // Subtle spatial-temporal harmonic color cycling across all 256 colors.
-          const colorIdx = 1 + ((rawIdx + phaseShift + ((x * 5 + y * 9) & 63)) % 255);
-          const wavePulse = reducedMotion ? 1 : 0.86 + 0.18 * Math.sin(now * 0.005 + x * 0.45 + y * 0.35);
-
-          const px = x * cellW + padX;
-          const py = y * cellH + padY;
-
-          if (rawIdx >= 150 && !reducedMotion) {
-            const haloSize = Math.max(cellW, cellH) * (1.5 + t * 0.9) * wavePulse;
-            const cx = x * cellW + cellW * 0.5;
-            const cy = y * cellH + cellH * 0.5;
-            ctx.globalAlpha = (t - 0.45) * 0.6;
-            ctx.drawImage(glowSprite, cx - haloSize * 0.5, cy - haloSize * 0.5, haloSize, haloSize);
-            ctx.globalAlpha = 1;
-          }
-
-          const scale = (0.52 + t * 0.46) * wavePulse;
-          const sw = baseW * scale;
-          const sh = baseH * scale;
-          const sx = px + (baseW - sw) * 0.5;
-          const sy = py + (baseH - sh) * 0.5;
-
-          ctx.fillStyle = lut[colorIdx];
-          ctx.fillRect(sx, sy, sw, sh);
-        }
-      }
+      offCtx.putImageData(imgData, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(offCanvas, 0, 0, canvas.width, canvas.height);
 
       if (!reducedMotion) {
         rafId = window.requestAnimationFrame(draw);
       }
     };
 
+    const onVisibility = () => {
+      if (!document.hidden && !reducedMotion && !rafId) {
+        rafId = window.requestAnimationFrame(draw);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     rafId = window.requestAnimationFrame(draw);
     return () => {
       window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', onVisibility);
       if (rafId) window.cancelAnimationFrame(rafId);
     };
   }, []);

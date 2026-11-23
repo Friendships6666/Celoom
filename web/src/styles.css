@@ -390,7 +390,8 @@ summary::-webkit-details-marker { display: none; }
 .session-route { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; }
 .session-route > summary { list-style: none; display: flex; gap: 8px; align-items: center; padding: 9px 11px; cursor: pointer; min-height: 35px; color: var(--muted); font-size: 10px; }
 .session-route > summary > svg { flex-shrink: 0; color: var(--accent); }
-.session-route > summary > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.session-route > summary > .assistant-avatar { width: 22px; height: 22px; margin-right: 0; flex: 0 0 22px; }
+.session-route > summary > span:not(.assistant-avatar) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .session-route > summary small { font-size: 9px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .session-route > summary > svg:last-child { color: var(--subtle); transition: transform .2s; }
 .session-route[open] > summary > svg:last-child { transform: rotate(180deg); }

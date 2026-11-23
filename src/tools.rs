@@ -491,8 +491,15 @@ pub fn validate(name: &str, args: &Value) -> Result<Call> {
 
 pub fn parse_dag_node_args(raw: &Value) -> Result<Value> {
     let v = match raw {
+        Value::Null => json!({}),
         Value::String(s) => {
-            serde_json::from_str::<Value>(s).context("DAG node args string must be valid JSON")?
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                json!({})
+            } else {
+                serde_json::from_str::<Value>(trimmed)
+                    .context("DAG node args string must be valid JSON")?
+            }
         }
         Value::Object(_) => raw.clone(),
         _ => bail!("DAG node args must be a JSON object string or object"),
@@ -693,7 +700,7 @@ pub fn schemas() -> Vec<Value> {
         ),
         function(
             "dag",
-            "Execute a Directed Acyclic Graph (DAG) of tool calls in parallel waves with conditional branching on upstream success/failure to minimize model roundtrips. Independent nodes run concurrently; downstream nodes run once all deps finish and satisfy 'on' ('success' default | 'failure' | 'always'). String values in args may reference {{node_id.output}} or {{node_id.status}}. Allowed inner tools: read, write, edit, glob, grep, bash, job, web_search, web_fetch, computer. args is a JSON-encoded object string.",
+            "Execute a Directed Acyclic Graph (DAG) of tool calls in parallel waves with conditional branching on upstream success/failure to minimize model roundtrips. Independent nodes run concurrently (set deps: null, on: null for root nodes); downstream nodes run once all deps finish and satisfy 'on' ('success' default | 'failure' | 'always'). String values in args may reference {{node_id.output}} or {{node_id.status}}. Allowed inner tools: read, write, edit, glob, grep, bash, job, web_search, web_fetch, computer. args is a JSON-encoded object string (e.g. \"{\\\"url\\\":\\\"...\\\"}\").",
             json!({
                 "nodes": {
                     "type": "array",

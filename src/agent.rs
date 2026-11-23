@@ -1745,25 +1745,18 @@ impl Engine {
                                 }
                             }
                         }
-                        Ok(Call::WebSearch(args)) => {
-                            let config = self.inner.store.config().await?;
-                            crate::web_tools::search(
-                                args,
-                                config.search,
-                                config.network,
+                        Ok(Call::Dag(args)) => {
+                            self.execute_dag(session, &request_snapshot, args, cancel.clone())
+                                .await
+                        }
+                        Ok(call) => {
+                            self.execute_leaf_call(
+                                session,
+                                &request_snapshot,
+                                call,
                                 cancel.clone(),
                             )
                             .await
-                        }
-                        Ok(Call::WebFetch(args)) => {
-                            let config = self.inner.store.config().await?;
-                            crate::web_tools::fetch(args, config.network, cancel.clone()).await
-                        }
-                        Ok(call) => {
-                            self.inner
-                                .tools
-                                .execute(&session.id, Path::new(&session.cwd), call, cancel.clone())
-                                .await
                         }
                     }
                 };
@@ -1868,7 +1861,7 @@ impl Engine {
     async fn execute_leaf_call(
         &self,
         session: &Session,
-        _snapshot: &Snapshot,
+        snapshot: &Snapshot,
         call: Call,
         cancel: CancellationToken,
     ) -> Result<String> {
@@ -1880,6 +1873,25 @@ impl Engine {
             Call::WebFetch(args) => {
                 let config = self.inner.store.config().await?;
                 crate::web_tools::fetch(args, config.network, cancel).await
+            }
+            Call::Computer(args) => {
+                if (args.action == "screenshot"
+                    || args.target() == "host" && args.action == "observe")
+                    && !snapshot.supports_images
+                {
+                    bail!(
+                        "Computer screenshots require an image-capable selected model; DOM/AX observe remains usable on text models"
+                    );
+                }
+                let (text, context) = self
+                    .inner
+                    .computer
+                    .execute(&session.id, args, cancel)
+                    .await?;
+                if !context.is_empty() && !snapshot.supports_images {
+                    bail!("This observation includes pixels; select an image-capable model");
+                }
+                Ok(text)
             }
             other => {
                 self.inner

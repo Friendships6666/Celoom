@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowRight, Check, ChevronDown, CircleHelp, Copy, FolderOpen, GitBranch, KeyRound, Lock, LogOut, Menu, MessageSquare, Moon, Pencil, Plus, RefreshCw, Search, Settings2, Shield, ShieldCheck, Sun, Trash2, Unlock, Volume2, VolumeX, X } from 'lucide-react';
 import { api, errorMessage, sanitizeConfig } from './api';
 import { LogoMark } from './Logo';
+import { AutomatonBg } from './AutomatonBg';
 import { Chat, Welcome } from './Chat';
 import { RuntimeMonitor } from './RuntimeMonitor';
 import { Settings } from './Settings';
@@ -22,10 +23,11 @@ export default function App() {
   const refresh = useCallback(async () => { setLoading(true); setError(''); try { setBootstrap(await api.bootstrap()); } catch (reason) { setError(errorMessage(reason)); } finally { setLoading(false); } }, []);
   useEffect(() => { void refresh(); const unauthorized = () => setBootstrap(current => current ? { ...current, authenticated: false } : current); window.addEventListener('celoom:unauthorized', unauthorized); return () => window.removeEventListener('celoom:unauthorized', unauthorized); }, [refresh]);
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
-  if (loading) return <div className="boot-screen"><Brand /><Spinner label="正在打开工作台" /></div>;
-  if (!bootstrap) return <div className="boot-screen"><Brand /><Alert>{error || '无法连接服务器。'}</Alert><button className="button secondary" onClick={() => void refresh()}>重新连接</button></div>;
-  if (typeof globalThis.crypto?.randomUUID !== 'function') return <main className="boot-screen"><Brand /><Alert>请使用 HTTPS 地址或本机 localhost 打开工作台。安全上下文与现代浏览器是保护登录信息及生成防重复请求 ID 的必要条件。</Alert><ThemeButton theme={theme} toggleTheme={toggleTheme} /></main>;
-  return bootstrap.authenticated ? <Workspace bootstrap={bootstrap} theme={theme} toggleTheme={toggleTheme} onLoggedOut={() => { setBootstrap({ ...bootstrap, authenticated: false }); }} /> : <Auth bootstrap={bootstrap} theme={theme} toggleTheme={toggleTheme} onAuthenticated={refresh} />;
+  const bg = <AutomatonBg theme={theme} authenticated={Boolean(bootstrap?.authenticated)} />;
+  if (loading) return <>{bg}<div className="boot-screen"><Brand /><Spinner label="正在打开工作台" /></div></>;
+  if (!bootstrap) return <>{bg}<div className="boot-screen"><Brand /><Alert>{error || '无法连接服务器。'}</Alert><button className="button secondary" onClick={() => void refresh()}>重新连接</button></div></>;
+  if (typeof globalThis.crypto?.randomUUID !== 'function') return <>{bg}<main className="boot-screen"><Brand /><Alert>请使用 HTTPS 地址或本机 localhost 打开工作台。安全上下文与现代浏览器是保护登录信息及生成防重复请求 ID 的必要条件。</Alert><ThemeButton theme={theme} toggleTheme={toggleTheme} /></main></>;
+  return <>{bg}{bootstrap.authenticated ? <Workspace bootstrap={bootstrap} theme={theme} toggleTheme={toggleTheme} onLoggedOut={() => { setBootstrap({ ...bootstrap, authenticated: false }); }} /> : <Auth bootstrap={bootstrap} theme={theme} toggleTheme={toggleTheme} onAuthenticated={refresh} />}</>;
 }
 function Brand({ compact = false }: { compact?: boolean }) { return <div className={`brand ${compact ? 'compact' : ''}`}><span className="brand-mark"><LogoMark size={36} /></span><span>Cel<span className="brand-light">oom</span></span></div>; }
 function ThemeButton({ theme, toggleTheme }: { theme: Theme; toggleTheme: () => void }) { return <button className="icon-button theme-button" onClick={toggleTheme} aria-label={theme === 'light' ? '切换到暗色主题' : '切换到明亮主题'} title={theme === 'light' ? '电光青 · 暗色' : '酒红 · 明亮'}>{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</button>; }

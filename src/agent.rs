@@ -31,6 +31,7 @@ struct Inner {
     child_permits: Arc<Semaphore>,
     wake: Notify,
     audit: tokio::sync::OnceCell<crate::cache_audit::CacheAudit>,
+    active_tools: std::sync::atomic::AtomicUsize,
 }
 struct Active {
     run_id: String,
@@ -65,7 +66,21 @@ impl Engine {
                 child_permits: Arc::new(Semaphore::new(4)),
                 wake: Notify::new(),
                 audit: tokio::sync::OnceCell::new(),
+                active_tools: std::sync::atomic::AtomicUsize::new(0),
             }),
+        }
+    }
+    pub async fn automaton_metrics(&self) -> crate::automaton::AutomatonMetrics {
+        let active_sessions = self.inner.active.lock().await.len();
+        let active_subagents = self.inner.children.lock().await.len();
+        let active_tools = self
+            .inner
+            .active_tools
+            .load(std::sync::atomic::Ordering::Relaxed);
+        crate::automaton::AutomatonMetrics {
+            active_sessions,
+            active_tools,
+            active_subagents,
         }
     }
     async fn audit(&self) -> Result<&crate::cache_audit::CacheAudit> {
@@ -1471,6 +1486,18 @@ impl Engine {
                 if fatal.is_none() {
                     let boundary_ref = &boundary;
                     let snapshot_ref = &request_snapshot;
+                    let tool_batch_count = prepared.len();
+                    struct ToolCounterGuard<'a>(&'a std::sync::atomic::AtomicUsize, usize);
+                    impl Drop for ToolCounterGuard<'_> {
+                        fn drop(&mut self) {
+                            self.0
+                                .fetch_sub(self.1, std::sync::atomic::Ordering::Relaxed);
+                        }
+                    }
+                    self.inner
+                        .active_tools
+                        .fetch_add(tool_batch_count, std::sync::atomic::Ordering::Relaxed);
+                    let _tool_guard = ToolCounterGuard(&self.inner.active_tools, tool_batch_count);
                     let futs = prepared.into_iter().map(|(call_id, name, validated, activity)| {
                         let engine = self.clone();
                         let session_clone = session.clone();

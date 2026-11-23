@@ -3,6 +3,7 @@
 compile_error!("Celoom supports Linux only.");
 
 mod agent;
+mod automaton;
 mod autonomy_store;
 mod cache_audit;
 mod computer;
@@ -74,6 +75,7 @@ struct AppState {
     attempts: Arc<Mutex<HashMap<IpAddr, Vec<Instant>>>>,
     password_slots: Arc<Semaphore>,
     shutdown: tokio_util::sync::CancellationToken,
+    automaton_tx: tokio::sync::broadcast::Sender<String>,
 }
 #[derive(Debug)]
 struct Options {
@@ -230,6 +232,7 @@ async fn main() -> Result<()> {
     );
     let engine = agent::Engine::new(store.clone(), options.data_dir.clone());
     let address = SocketAddr::new(options.bind, options.port);
+    let (automaton_tx, _) = tokio::sync::broadcast::channel::<String>(16);
     let state = AppState {
         quality: quality::QualityChecks::new(store.clone()),
         store,
@@ -238,7 +241,39 @@ async fn main() -> Result<()> {
         attempts: Arc::new(Mutex::new(HashMap::new())),
         password_slots: Arc::new(Semaphore::new(2)),
         shutdown: tokio_util::sync::CancellationToken::new(),
+        automaton_tx: automaton_tx.clone(),
     };
+    {
+        let engine = state.engine.clone();
+        let shutdown = state.shutdown.clone();
+        let tx = automaton_tx;
+        tokio::spawn(async move {
+            let mut sim = automaton::Automaton::new();
+            loop {
+                if shutdown.is_cancelled() {
+                    break;
+                }
+                let metrics = engine.automaton_metrics().await;
+                let interval_ms = if metrics.active_tools > 0 || metrics.active_subagents > 0 {
+                    85
+                } else if metrics.active_sessions > 0 {
+                    125
+                } else {
+                    210
+                };
+                if tx.receiver_count() > 0 {
+                    let frame = sim.step(metrics);
+                    if let Ok(encoded) = serde_json::to_string(&frame) {
+                        let _ = tx.send(encoded);
+                    }
+                }
+                tokio::select! {
+                    _ = shutdown.cancelled() => break,
+                    _ = tokio::time::sleep(Duration::from_millis(interval_ms)) => {}
+                }
+            }
+        });
+    }
     let router = app(state.clone());
     let listener = tokio::net::TcpListener::bind(address)
         .await
@@ -305,6 +340,7 @@ fn app(state: AppState) -> Router {
                 .delete(computer_cookies_clear),
         )
         .route("/api/runtime/overview", get(runtime_overview_route))
+        .route("/api/automaton/stream", get(automaton_stream_route))
         .route("/api/subagents/{id}/resume", post(subagent_resume_route))
         .route("/api/subagents/{id}/cancel", post(subagent_cancel_route))
         .route("/api/subagents/cancel-all", post(subagents_cancel_all_route))
@@ -788,6 +824,48 @@ async fn runtime_overview_route(
             .runtime_overview(query.session_id.as_deref())
             .await?,
     ))
+}
+async fn automaton_stream_route(State(state): State<AppState>) -> Response {
+    let mut sub = state.automaton_tx.subscribe();
+    let shutdown = state.shutdown.clone();
+    let (tx, rx) =
+        tokio::sync::mpsc::channel::<std::result::Result<axum::response::sse::Event, Infallible>>(
+            16,
+        );
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = shutdown.cancelled() => break,
+                msg = sub.recv() => match msg {
+                    Ok(payload) => {
+                        let event = axum::response::sse::Event::default()
+                            .event("frame")
+                            .data(payload);
+                        if tokio::time::timeout(Duration::from_secs(2), tx.send(Ok(event))).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        }
+    });
+    let mut response = Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
+        .keep_alive(
+            KeepAlive::new()
+                .interval(Duration::from_secs(15))
+                .text("heartbeat"),
+        )
+        .into_response();
+    response
+        .headers_mut()
+        .insert("x-accel-buffering", HeaderValue::from_static("no"));
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-cache, no-transform"),
+    );
+    response
 }
 async fn subagent_resume_route(
     State(state): State<AppState>,
@@ -1419,6 +1497,7 @@ mod tests {
             attempts: Arc::new(Mutex::new(HashMap::new())),
             password_slots: Arc::new(Semaphore::new(2)),
             shutdown: tokio_util::sync::CancellationToken::new(),
+            automaton_tx: tokio::sync::broadcast::channel(8).0,
         };
         (state, dir)
     }

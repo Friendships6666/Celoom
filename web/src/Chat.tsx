@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type FormEvent, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type FormEvent, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -135,7 +135,7 @@ function CodeBlock({ className, children }: { className?: string; children: Reac
   );
 }
 
-function Markdown({ text }: { text: string }) {
+const Markdown = memo(function Markdown({ text }: { text: string }) {
   const normalized = useMemo(() => normalizeLatexDelimiters(text), [text]);
   return (
     <ReactMarkdown
@@ -158,7 +158,7 @@ function Markdown({ text }: { text: string }) {
       {normalized}
     </ReactMarkdown>
   );
-}
+});
 function timeLabel(time: string) { const date = new Date(time); return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 function ToolCard({ item, running }: { item: Extract<TimelineItem, { kind: 'tool' }>; running: boolean }) {
   const operation = toolSummary(item.name, item.args);
@@ -166,7 +166,7 @@ function ToolCard({ item, running }: { item: Extract<TimelineItem, { kind: 'tool
   const Icon = tool === 'dag' ? Workflow : tool === 'subagent' ? GitBranch : tool === 'computer' ? Monitor : tool === 'ask_user' ? CircleHelp : tool === 'goal' ? Target : tool === 'web_search' ? Search : tool === 'web_fetch' ? Globe2 : tool === 'read_image' ? ImageIcon : Terminal;
   return <details className={`tool-card ${item.error ? 'tool-error' : ''}`}><summary><span className="tool-icon"><Icon size={16} /></span><span className="tool-summary"><strong>{item.name || '工具调用'}</strong>{operation && <code className="tool-operation" title={operation}>{operation}</code>}<small>{item.finished ? item.error ? '执行失败' : '执行完成' : running ? '正在执行' : '未确认完成'}</small></span><span className="tool-result-icon">{item.finished ? item.error ? <CircleAlert size={15} /> : <Check size={15} /> : running ? <LoaderCircle size={15} className="spin" /> : <CircleAlert size={15} />}</span><ChevronRight size={15} className="details-chevron" /></summary><div className="tool-details"><span className="section-eyebrow">输入参数</span><pre>{tool === 'computer' ? safeComputerText(typeof item.args === 'string' ? item.args : JSON.stringify(item.args, null, 2) ?? '') : typeof item.args === 'string' ? item.args : JSON.stringify(item.args, null, 2)}</pre>{item.output !== undefined && <><span className="section-eyebrow">输出</span><pre>{item.output || '（无输出）'}</pre></>}{item.finished && item.capture?.capture_id && <ComputerCapture activity={item.capture} compact />}</div></details>;
 }
-function TimelineEntry({ item, running, onOpenSession, onPreview, model, sessionId }: { item: TimelineItem; running: boolean; onOpenSession: (id: string) => void; onPreview: (images: ImageInput[], index: number) => void; model?: ModelOption; sessionId: string }) {
+const TimelineEntry = memo(function TimelineEntry({ item, running, onOpenSession, onPreview, model, sessionId }: { item: TimelineItem; running: boolean; onOpenSession: (id: string) => void; onPreview: (images: ImageInput[], index: number) => void; model?: ModelOption; sessionId: string }) {
   if (item.kind === 'user') {
     const attachments = item.images.filter(image => !!renderImage(image));
     return <article className="message user-message"><div className="message-meta"><span>你</span><time>{timeLabel(item.time)}</time>{item.queued && <span className="queued-badge">{item.interrupted || item.deliveryMode === 'immediate' ? '已排队 · 强制介入' : '已排队 · 等待交付'}</span>}</div>{attachments.length > 0 && <div className="message-images">{attachments.map((image, i) => <button type="button" className="message-image-button" key={i} aria-label={`查看附件 ${i + 1}`} onClick={() => onPreview(attachments, i)}><img src={renderImage(image)} alt={`图片附件 ${i + 1}`} loading="lazy" /></button>)}</div>}{item.text && <div className="user-text">{item.text}</div>}</article>;
@@ -237,18 +237,21 @@ function TimelineEntry({ item, running, onOpenSession, onPreview, model, session
   if (item.kind === 'files') return <TurnFilesCard files={item.files} sessionId={sessionId} />;
   if (item.kind === 'subagent') return <button className="subagent-card" onClick={() => onOpenSession(item.id)} disabled={!item.id}><span className="subagent-icon"><GitBranch size={19} /></span><span><strong>子 Agent <span className={`mini-status ${activeStatus(item.status) ? 'active' : ''}`}>{statusLabels[item.status as Session['status']] ?? item.status}</span></strong><small>{item.task || '查看子 Agent 会话'}</small>{subagentLabel(item.source) && <em className="subagent-caption" title={[item.source?.model, item.source?.reasoning_effort === '' ? '不发送思考等级' : item.source?.reasoning_effort].filter(Boolean).join(' · ')}>{subagentLabel(item.source)}{item.source?.reasoning_effort && <span> · {item.source.reasoning_effort}</span>}</em>}</span><ChevronRight size={17} /></button>;
   return <div className={`event-notice ${item.tone}`}><CircleAlert size={15} /><details><summary>{item.text.split('\n')[0]}</summary>{item.text.includes('\n') && <pre>{item.text.split('\n').slice(1).join('\n')}</pre>}</details></div>;
-}
+});
 
 interface ChatProps {
   session: Session | null; events: AgentEvent[]; model?: ModelOption; config: AppConfig | null; connection: Connection;
   error: string; onReload: () => void; onOpenSession: (id: string) => void; onOpenSettings: () => void; onSettingsSaved: (session: Session) => void;
 }
+const WINDOW_STEP = 60;
+
 export function Chat({ session, events, model, config, connection, error, onReload, onOpenSession, onOpenSettings, onSettingsSaved }: ChatProps) {
   const [text, setText] = useState('');
   const [images, setImages] = useState<ImageInput[]>([]);
   const [preview, setPreview] = useState<{ images: ImageInput[]; index: number } | null>(null);
-  const openPreview = (attachments: ImageInput[], index: number) => setPreview({ images: attachments, index });
-  useEffect(() => { setPreview(null); }, [session?.id]);
+  const openPreview = useCallback((attachments: ImageInput[], index: number) => setPreview({ images: attachments, index }), []);
+  const [visibleCount, setVisibleCount] = useState(WINDOW_STEP);
+  useEffect(() => { setPreview(null); setVisibleCount(WINDOW_STEP); }, [session?.id]);
   const [sending, setSending] = useState(false);
   const [action, setAction] = useState<'cancel' | 'compact' | null>(null);
   const [actionError, setActionError] = useState('');
@@ -275,13 +278,34 @@ export function Chat({ session, events, model, config, connection, error, onRelo
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const items = useMemo(() => timeline(events.filter(event => event.session_id === session?.id)), [events, session?.id]);
+  const hiddenCount = Math.max(0, items.length - visibleCount);
+  const visibleItems = useMemo(() => (hiddenCount > 0 ? items.slice(hiddenCount) : items), [items, hiddenCount]);
+  const hasUserMessage = useMemo(() => events.some(e => e.type === 'user_message'), [events]);
+  const loadMoreHistory = useCallback((all = false) => {
+    const el = scroll.current;
+    const prevHeight = el ? el.scrollHeight : 0;
+    const prevTop = el ? el.scrollTop : 0;
+    setVisibleCount(c => (all ? items.length : c + WINDOW_STEP));
+    if (el) {
+      requestAnimationFrame(() => {
+        if (scroll.current === el) {
+          el.scrollTop = prevTop + (el.scrollHeight - prevHeight);
+        }
+      });
+    }
+  }, [items.length]);
   const pendingMessage = useMemo(() => {
     const queued = items.flatMap(item => item.kind === 'user' && item.queued && item.clientId ? [{ id: item.clientId, time: Date.parse(item.time) || 0, immediate: item.interrupted || item.deliveryMode === 'immediate' }] : []);
     const local = outbox.entries.map(entry => ({ id: entry.client_message_id, time: entry.created_at, immediate: entry.delivery_mode === 'immediate' }));
     return [...queued, ...local].sort((a, b) => a.time - b.time).at(-1);
   }, [items, outbox.entries]);
   const running = activeStatus(session?.status);
-  const usage = [...events].reverse().find(e => e.type === 'usage')?.data;
+  const usage = useMemo(() => {
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i].type === 'usage') return events[i].data;
+    }
+    return undefined;
+  }, [events]);
   const usageInput = Number(usage?.input_tokens);
   const usageOutput = Number(usage?.output_tokens);
   const rawCached = usage?.cached_tokens ?? (usage?.upstream_usage as { input_tokens_details?: { cached_tokens?: unknown } } | undefined)?.input_tokens_details?.cached_tokens;
@@ -357,11 +381,11 @@ export function Chat({ session, events, model, config, connection, error, onRelo
   if (connection === 'loading') return <div className="chat-loading"><Spinner label="读取会话与消息记录" /></div>;
   if (!session) return <div className="chat-loading"><Alert>{error || '会话暂不可用。'}</Alert><button className="button secondary" onClick={onReload}>重新加载</button></div>;
   return <div className="chat-workspace"><div className="chat-layout">
-    <div className="conversation-region"><div className="conversation-scroll" ref={scroll} onScroll={() => { const el = scroll.current; if (el) { follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; setScrolledAway(!follow.current); } }}>
+    <div className="conversation-region"><div className="conversation-scroll" ref={scroll} onScroll={() => { const el = scroll.current; if (el) { follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; setScrolledAway(!follow.current); if (hiddenCount > 0 && el.scrollTop < 100) loadMoreHistory(false); } }}>
       <div className="conversation">
         {error && <Alert>{error}<button className="text-button" onClick={onReload}>重新加载</button></Alert>}
         {session.parent_id && <button className="parent-session text-button" onClick={() => onOpenSession(session.parent_id!)}><GitBranch size={14} />返回父会话</button>}
-        {items.length ? <div className="timeline">{items.map(item => <TimelineEntry key={`${item.kind}-${item.key}`} item={item} running={running} onOpenSession={onOpenSession} onPreview={openPreview} model={model} sessionId={session.id} />)}</div> : <div className="conversation-empty"><span className="empty-emblem"><LogoMark size={36} /></span><h2>开始这次会话</h2><p>在下方输入你的目标。</p></div>}
+        {items.length ? <div className="timeline">{hiddenCount > 0 && <div className="history-loader"><button type="button" className="text-button" onClick={() => loadMoreHistory(false)}>加载更早 {Math.min(WINDOW_STEP, hiddenCount)} 条（还有 {hiddenCount} 条）</button><button type="button" className="text-button" onClick={() => loadMoreHistory(true)}>显示全部</button></div>}{visibleItems.map(item => <TimelineEntry key={`${item.kind}-${item.key}`} item={item} running={running} onOpenSession={onOpenSession} onPreview={openPreview} model={model} sessionId={session.id} />)}</div> : <div className="conversation-empty"><span className="empty-emblem"><LogoMark size={36} /></span><h2>开始这次会话</h2><p>在下方输入你的目标。</p></div>}
         {running && !items.some(item => item.kind === 'assistant' && item.provisional) && <div className="working-state" role="status"><span className="working-dots"><i /><i /><i /></span>{session.status === 'auto_compacting' ? '正在自动整理上下文，完成后继续任务' : session.status === 'compacting' ? '正在整理上下文' : session.status === 'waiting_for_answer' ? '任务等待你的回答，请查看下方问题' : session.status === 'waiting_for_network' ? '等待网络恢复 · 自动继续，可发送消息或停止' : 'Agent 正在工作'}</div>}
         <div ref={bottom} className="scroll-anchor" />
       </div>
@@ -405,7 +429,7 @@ export function Chat({ session, events, model, config, connection, error, onRelo
             : '上下文 0%'}
         </span>
       </div>
-      <div className="composer-footnote"><span>{connection === 'reconnecting' ? <><span className="connection-dot warning" />连接中断，正从最新事件重连</> : <><span className={`connection-dot ${connection === 'connected' ? '' : 'warning'}`} />{connection === 'connected' ? '已连接' : '未连接'}<span className="desktop-only"> · {running ? '断开页面不会取消任务' : 'Shift + Enter 换行'}</span></>}</span><div className="composer-footnote-actions">{usage && Number.isFinite(usageInput) && Number.isFinite(usageOutput) && <span className="usage-inline" title={`上下文窗口 ${usage.context_window} · 最大输出 ${usage.max_output_tokens}${usageCached !== null ? ` · 缓存命中 ${usageCached.toLocaleString()} / ${usageInput.toLocaleString()}${cacheHitRate !== null ? ` (${cacheHitRate.toFixed(1)}%)` : ''}` : ''}`}>输入 {usageInput.toLocaleString()} / 输出 {usageOutput.toLocaleString()}{cacheHitRate !== null && ` · 缓存 ${cacheHitRate.toFixed(1)}%`}</span>}<button type="button" className="icon-button compact-button" onClick={() => void runAction('compact')} disabled={running || sending || action !== null || !events.some(e => e.type === 'user_message')} title="手动压缩上下文" aria-label="手动压缩上下文">{action === 'compact' ? <LoaderCircle size={14} className="spin" /> : <Minimize2 size={14} />}</button></div></div>
+      <div className="composer-footnote"><span>{connection === 'reconnecting' ? <><span className="connection-dot warning" />连接中断，正从最新事件重连</> : <><span className={`connection-dot ${connection === 'connected' ? '' : 'warning'}`} />{connection === 'connected' ? '已连接' : '未连接'}<span className="desktop-only"> · {running ? '断开页面不会取消任务' : 'Shift + Enter 换行'}</span></>}</span><div className="composer-footnote-actions">{usage && Number.isFinite(usageInput) && Number.isFinite(usageOutput) && <span className="usage-inline" title={`上下文窗口 ${usage.context_window} · 最大输出 ${usage.max_output_tokens}${usageCached !== null ? ` · 缓存命中 ${usageCached.toLocaleString()} / ${usageInput.toLocaleString()}${cacheHitRate !== null ? ` (${cacheHitRate.toFixed(1)}%)` : ''}` : ''}`}>输入 {usageInput.toLocaleString()} / 输出 {usageOutput.toLocaleString()}{cacheHitRate !== null && ` · 缓存 ${cacheHitRate.toFixed(1)}%`}</span>}<button type="button" className="icon-button compact-button" onClick={() => void runAction('compact')} disabled={running || sending || action !== null || !hasUserMessage} title="手动压缩上下文" aria-label="手动压缩上下文">{action === 'compact' ? <LoaderCircle size={14} className="spin" /> : <Minimize2 size={14} />}</button></div></div>
     </div></div>
   </div>{preview && <ImageLightbox images={preview.images} initialIndex={preview.index} onClose={() => setPreview(null)} />}<FileSidebar sessionId={session.id} events={events} open={filesOpen} onClose={closeFiles} toggleRef={fileToggle} />{computerOpen && <ComputerPanel sessionId={session.id} events={events} authorizedBefore={computerAuthorized} onAuthorized={() => setComputerAuthorized(true)} onClose={() => setComputerOpen(false)} />}</div>;
 }

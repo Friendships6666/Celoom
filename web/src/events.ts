@@ -27,6 +27,12 @@ export function turnFiles(value: unknown): TurnFile[] {
   return Array.isArray(value) ? value.filter(isRecord).filter(file => isRelativeFilePath(str(file.path)) && changeKind(file.kind)).map(file => ({ path: str(file.path), name: str(file.name) || str(file.path).split('/').at(-1)!, kind: file.kind as FileChangeKind })) : [];
 }
 export function mergeEvents(current: AgentEvent[], incoming: AgentEvent[]): AgentEvent[] {
+  if (incoming.length === 1 && current.length > 0) {
+    const ev = incoming[0];
+    if (Number.isSafeInteger(ev.seq) && ev.seq > current[current.length - 1].seq) {
+      return [...current, ev];
+    }
+  }
   const bySeq = new Map(current.map(event => [event.seq, event]));
   for (const event of incoming) if (Number.isSafeInteger(event.seq) && !bySeq.has(event.seq)) bySeq.set(event.seq, event);
   return [...bySeq.values()].sort((a, b) => a.seq - b.seq);

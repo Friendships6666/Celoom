@@ -1006,8 +1006,8 @@ async fn create_session(
         Some("~") => home_dir.clone(),
         Some(raw) if raw.starts_with("~/") => home_dir.join(&raw[2..]),
         Some(raw) => PathBuf::from(raw),
-        None => home_dir.join(format!(
-            "JAA-{}",
+        None => home_dir.join(".Celoom-Sessions").join(format!(
+            "Celoom-{}",
             chrono::Local::now().format("%Y%m%d-%H%M%S")
         )),
     };

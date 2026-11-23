@@ -489,6 +489,46 @@ pub fn validate(name: &str, args: &Value) -> Result<Call> {
     Ok(call)
 }
 
+fn repair_relaxed_json(input: &str) -> String {
+    let mut out = String::with_capacity(input.len() + 16);
+    let mut chars = input.chars().peekable();
+    let mut in_string = false;
+    while let Some(ch) = chars.next() {
+        if !in_string {
+            if ch == '"' {
+                in_string = true;
+            }
+            out.push(ch);
+            continue;
+        }
+        match ch {
+            '"' => {
+                in_string = false;
+                out.push('"');
+            }
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => {
+                out.push_str(&format!("\\u{:04x}", c as u32));
+            }
+            '\\' => match chars.peek().copied() {
+                Some('"' | '\\' | '/' | 'b' | 'f' | 'n' | 'r' | 't') => {
+                    out.push('\\');
+                    out.push(chars.next().unwrap());
+                }
+                Some('u') => {
+                    out.push('\\');
+                    out.push(chars.next().unwrap());
+                }
+                _ => out.push_str("\\\\"),
+            },
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
 pub fn parse_dag_node_args(raw: &Value) -> Result<Value> {
     let v = match raw {
         Value::Null => json!({}),
@@ -497,8 +537,15 @@ pub fn parse_dag_node_args(raw: &Value) -> Result<Value> {
             if trimmed.is_empty() {
                 json!({})
             } else {
-                serde_json::from_str::<Value>(trimmed)
-                    .context("DAG node args string must be valid JSON")?
+                match serde_json::from_str::<Value>(trimmed) {
+                    Ok(parsed) => parsed,
+                    Err(first_err) => {
+                        let repaired = repair_relaxed_json(trimmed);
+                        serde_json::from_str::<Value>(&repaired).with_context(|| {
+                            format!("DAG node args string must be valid JSON ({first_err})")
+                        })?
+                    }
+                }
             }
         }
         Value::Object(_) => raw.clone(),
@@ -548,7 +595,8 @@ fn validate_dag(dag: &DagArgs) -> Result<()> {
         {
             bail!("Invalid DAG branch condition on '{}': {cond}", node.id);
         }
-        let parsed_args = parse_dag_node_args(&node.args)?;
+        let parsed_args = parse_dag_node_args(&node.args)
+            .with_context(|| format!("Invalid args on DAG node '{}'", node.id))?;
         if !node.args.to_string().contains("{{") {
             validate(&node.tool, &parsed_args)
                 .with_context(|| format!("Invalid args for DAG node '{}'", node.id))?;
@@ -1586,5 +1634,18 @@ mod tests {
             ]
         });
         assert!(validate("dag", &nested_dag).is_err());
+
+        let unescaped_controls_and_regex = json!({
+            "nodes": [
+                {
+                    "id": "fix",
+                    "tool": "bash",
+                    "args": "{\"command\":\"set -eu\nsed -i 's/\\[a\\]/b/' file.txt\",\"cwd\":\".\"}",
+                    "deps": null,
+                    "on": null
+                }
+            ]
+        });
+        assert!(validate("dag", &unescaped_controls_and_regex).is_ok());
     }
 }

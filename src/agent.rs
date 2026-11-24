@@ -32,6 +32,7 @@ struct Inner {
     wake: Notify,
     audit: tokio::sync::OnceCell<crate::cache_audit::CacheAudit>,
     active_tools: std::sync::atomic::AtomicUsize,
+    active_tool_kinds: [std::sync::atomic::AtomicUsize; 5],
 }
 struct Active {
     run_id: String,
@@ -67,6 +68,7 @@ impl Engine {
                 wake: Notify::new(),
                 audit: tokio::sync::OnceCell::new(),
                 active_tools: std::sync::atomic::AtomicUsize::new(0),
+                active_tool_kinds: std::array::from_fn(|_| std::sync::atomic::AtomicUsize::new(0)),
             }),
         }
     }
@@ -82,10 +84,17 @@ impl Engine {
             .inner
             .active_tools
             .load(std::sync::atomic::Ordering::Relaxed);
+        let mut tool_kinds = 0u8;
+        for (bit, counter) in self.inner.active_tool_kinds.iter().enumerate() {
+            if counter.load(std::sync::atomic::Ordering::Relaxed) > 0 {
+                tool_kinds |= 1 << bit;
+            }
+        }
         crate::automaton::AutomatonMetrics {
             active_sessions,
             active_tools,
             active_subagents,
+            tool_kinds,
         }
     }
     async fn audit(&self) -> Result<&crate::cache_audit::CacheAudit> {
@@ -1503,17 +1512,43 @@ impl Engine {
                     let boundary_ref = &boundary;
                     let snapshot_ref = &request_snapshot;
                     let tool_batch_count = prepared.len();
-                    struct ToolCounterGuard<'a>(&'a std::sync::atomic::AtomicUsize, usize);
+                    let mut kind_counts = [0usize; 5];
+                    for (_, name, _, _) in &prepared {
+                        kind_counts[tool_kind_index(name)] += 1;
+                    }
+                    struct ToolCounterGuard<'a>(
+                        &'a std::sync::atomic::AtomicUsize,
+                        usize,
+                        &'a [std::sync::atomic::AtomicUsize; 5],
+                        [usize; 5],
+                    );
                     impl Drop for ToolCounterGuard<'_> {
                         fn drop(&mut self) {
                             self.0
                                 .fetch_sub(self.1, std::sync::atomic::Ordering::Relaxed);
+                            for (i, n) in self.3.iter().enumerate() {
+                                if *n > 0 {
+                                    self.2[i]
+                                        .fetch_sub(*n, std::sync::atomic::Ordering::Relaxed);
+                                }
+                            }
                         }
                     }
                     self.inner
                         .active_tools
                         .fetch_add(tool_batch_count, std::sync::atomic::Ordering::Relaxed);
-                    let _tool_guard = ToolCounterGuard(&self.inner.active_tools, tool_batch_count);
+                    for (i, n) in kind_counts.iter().enumerate() {
+                        if *n > 0 {
+                            self.inner.active_tool_kinds[i]
+                                .fetch_add(*n, std::sync::atomic::Ordering::Relaxed);
+                        }
+                    }
+                    let _tool_guard = ToolCounterGuard(
+                        &self.inner.active_tools,
+                        tool_batch_count,
+                        &self.inner.active_tool_kinds,
+                        kind_counts,
+                    );
                     let futs = prepared.into_iter().map(|(call_id, name, validated, activity)| {
                         let engine = self.clone();
                         let session_clone = session.clone();
@@ -1976,7 +2011,16 @@ impl Engine {
             }
 
             let batch_len = ready.len();
+            let mut wave_kinds = [0usize; 5];
+            for &idx in &ready {
+                wave_kinds[tool_kind_index(&dag.nodes[idx].tool)] += 1;
+            }
             self.inner.active_tools.fetch_add(batch_len, Ordering::Relaxed);
+            for (i, n) in wave_kinds.iter().enumerate() {
+                if *n > 0 {
+                    self.inner.active_tool_kinds[i].fetch_add(*n, Ordering::Relaxed);
+                }
+            }
             let futs = ready.into_iter().map(|idx| {
                 let engine = self.clone();
                 let session_clone = session.clone();
@@ -2016,6 +2060,11 @@ impl Engine {
             });
             let wave_results = futures_util::future::join_all(futs).await;
             self.inner.active_tools.fetch_sub(batch_len, Ordering::Relaxed);
+            for (i, n) in wave_kinds.iter().enumerate() {
+                if *n > 0 {
+                    self.inner.active_tool_kinds[i].fetch_sub(*n, Ordering::Relaxed);
+                }
+            }
 
             let mut wave_failed = false;
             for (idx, elapsed_ms, res) in wave_results {
@@ -2752,6 +2801,16 @@ fn completed_boundary(items: &[Value]) -> Result<()> {
     }
     Ok(())
 }
+fn tool_kind_index(name: &str) -> usize {
+    match name {
+        "bash" | "job" => 0,
+        "write" | "edit" => 1,
+        "read" | "glob" | "grep" | "read_image" => 2,
+        "web_search" | "web_fetch" | "dag" => 3,
+        _ => 4,
+    }
+}
+
 fn route_fingerprint(snapshot: &Snapshot) -> String {
     // Includes per-request transport identity through a private snapshot helper.
     snapshot.replay_fingerprint()

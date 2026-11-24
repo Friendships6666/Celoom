@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { ArrowDown, ArrowUp, Brain, Check, ChevronRight, CircleAlert, CircleHelp, Code2, Copy, Eye, FolderOpen, GitBranch, Globe2, Image as ImageIcon, ImagePlus, LoaderCircle, Minimize2, Monitor, Search, Square, Target, Terminal, Workflow, X, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, Brain, Check, ChevronRight, CircleAlert, CircleHelp, Code2, Copy, Eye, FolderOpen, GitBranch, Globe2, Image as ImageIcon, ImagePlus, Infinity as InfinityIcon, LoaderCircle, Minimize2, Monitor, Power, Search, Square, Target, Terminal, Workflow, X, Zap } from 'lucide-react';
 import { api, errorMessage } from './api';
 import { subagentLabel, timeline, toolSummary, type TimelineItem } from './events';
 import { LogoMark } from './Logo';
@@ -260,6 +260,10 @@ export function Chat({ session, events, model, config, connection, error, onRelo
   const [filesOpen, setFilesOpen] = useState(false);
   const [computerOpen, setComputerOpen] = useState(false);
   const [computerAuthorized, setComputerAuthorized] = useState(false);
+  const [activatorOpen, setActivatorOpen] = useState(false);
+  const [activatorPrompt, setActivatorPrompt] = useState(session?.activator_prompt ?? '');
+  const [activatorBusy, setActivatorBusy] = useState(false);
+  useEffect(() => { setActivatorPrompt(session?.activator_prompt ?? ''); }, [session?.id, session?.activator_prompt]);
   const fileToggle = useRef<HTMLButtonElement>(null);
   const closeFiles = useCallback(() => setFilesOpen(false), []);
   const bottom = useRef<HTMLDivElement>(null);
@@ -394,7 +398,66 @@ export function Chat({ session, events, model, config, connection, error, onRelo
     </div>
     {scrolledAway && <button className="jump-bottom" onClick={() => { follow.current = true; setScrolledAway(false); bottom.current?.scrollIntoView({ behavior: 'smooth' }); }}><ArrowDown size={16} />回到最新</button>}
     </div><div className="composer-area"><div className="composer-wrap">
-      <div className="session-controls"><SessionRoute session={session} config={config} onSaved={onSettingsSaved} onOpenSettings={onOpenSettings} /><button className={`icon-button computer-toggle ${computerOpen ? 'selected' : ''}`} aria-label="打开计算机面板" aria-haspopup="dialog" aria-expanded={computerOpen} title="计算机 · 隔离优先" onClick={() => setComputerOpen(true)}><Monitor size={18} /></button><button ref={fileToggle} className="icon-button files-toggle" aria-label="打开文件面板" aria-controls="session-files" aria-expanded={filesOpen} title="工作目录文件" onClick={() => setFilesOpen(value => !value)}><FolderOpen size={18} /></button></div>
+      <div className="session-controls"><SessionRoute session={session} config={config} onSaved={onSettingsSaved} onOpenSettings={onOpenSettings} />{session.depth === 0 && <button type="button" className={`icon-button activator-toggle ${session.activator_enabled ? 'active' : ''}`} aria-label="外部激活器" aria-expanded={activatorOpen} title={session.activator_enabled ? '激活器已开启（AI 永不停止）' : '打开外部激活器'} onClick={() => setActivatorOpen(v => !v)}><InfinityIcon size={18} /></button>}<button className={`icon-button computer-toggle ${computerOpen ? 'selected' : ''}`} aria-label="打开计算机面板" aria-haspopup="dialog" aria-expanded={computerOpen} title="计算机 · 隔离优先" onClick={() => setComputerOpen(true)}><Monitor size={18} /></button><button ref={fileToggle} className="icon-button files-toggle" aria-label="打开文件面板" aria-controls="session-files" aria-expanded={filesOpen} title="工作目录文件" onClick={() => setFilesOpen(value => !value)}><FolderOpen size={18} /></button></div>
+      {session.depth === 0 && activatorOpen && (
+        <section className={`activator-panel ${session.activator_enabled ? 'is-on' : ''}`} aria-label="外部持久激活器">
+          <div className="activator-header">
+            <div className="activator-title">
+              <InfinityIcon size={15} />
+              <strong>外部激活器</strong>
+              <span className={`activator-badge ${session.activator_enabled ? 'on' : ''}`}>{session.activator_enabled ? '运行中 · 永不停止' : '已关闭'}</span>
+            </div>
+            <small>完全外部控制，AI 无法读取或关闭；开启后每次回复结束都会自动按指令继续</small>
+          </div>
+          <textarea
+            rows={2}
+            value={activatorPrompt}
+            disabled={activatorBusy}
+            onChange={e => setActivatorPrompt(e.target.value)}
+            placeholder="输入激活器指令（例如：持续检查测试、修复问题并汇报进度，不要停止）..."
+          />
+          <div className="activator-actions">
+            {session.activator_enabled ? (
+              <>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={activatorBusy || !activatorPrompt.trim()}
+                  onClick={() => {
+                    setActivatorBusy(true); setActionError('');
+                    void api.setActivator(session.id, { enabled: true, prompt: activatorPrompt }).then(onSettingsSaved).catch(r => setActionError(errorMessage(r))).finally(() => setActivatorBusy(false));
+                  }}
+                >
+                  更新指令
+                </button>
+                <button
+                  type="button"
+                  className="button danger"
+                  disabled={activatorBusy}
+                  onClick={() => {
+                    setActivatorBusy(true); setActionError('');
+                    void api.setActivator(session.id, { enabled: false, prompt: activatorPrompt }).then(onSettingsSaved).catch(r => setActionError(errorMessage(r))).finally(() => setActivatorBusy(false));
+                  }}
+                >
+                  <Power size={14} />关闭激活器
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="button primary"
+                disabled={activatorBusy || !activatorPrompt.trim()}
+                onClick={() => {
+                  setActivatorBusy(true); setActionError('');
+                  void api.setActivator(session.id, { enabled: true, prompt: activatorPrompt }).then(onSettingsSaved).catch(r => setActionError(errorMessage(r))).finally(() => setActivatorBusy(false));
+                }}
+              >
+                <Power size={14} />开启激活器
+              </button>
+            )}
+          </div>
+        </section>
+      )}
       {actionError && <Alert onClose={() => setActionError('')}>{actionError}</Alert>}
       {outbox.error && <Alert>{outbox.error}</Alert>}
       {outbox.entries.length > 0 && <section className="outbox" aria-label="本地待发送消息"><header><span className="connection-dot warning" />本地待发送 <b>{outbox.entries.length}</b><small>已可靠保存 · 恢复连接后重试</small></header>{outbox.entries.map(entry => <div className={`outbox-entry ${entry.status}`} key={entry.client_message_id}><div><p>{entry.text || '图片消息'}{entry.images.length > 0 && <small> · {entry.images.length} 张图片</small>}</p><small role="status">{entry.status === 'sending' ? '正在发送…' : entry.failure ? failureLabels[entry.failure] : '等待发送'} · {entry.delivery_mode === 'immediate' ? '尽快介入' : '工具边界后交付'}</small></div><div className="outbox-actions"><button className="text-button" type="button" disabled={entry.status === 'sending'} onClick={() => void outbox.box?.retry(entry.client_message_id).catch(reason => setActionError(errorMessage(reason)))}>重试</button><button className="text-button danger-text" type="button" disabled={entry.status === 'sending'} onClick={() => void outbox.box?.discard(entry.client_message_id).catch(reason => setActionError(errorMessage(reason)))}>丢弃</button></div></div>)}</section>}

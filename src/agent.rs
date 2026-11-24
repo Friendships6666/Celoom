@@ -446,6 +446,56 @@ impl Engine {
         self.launch(session, run_id.clone(), cancel, false, None);
         Ok(run_id)
     }
+    pub async fn update_activator(
+        &self,
+        id: &str,
+        enabled: bool,
+        prompt: &str,
+    ) -> Result<Session> {
+        let session = self.inner.store.session(id).await?;
+        if session.depth > 0 {
+            bail!("Child sessions do not support external activator");
+        }
+        if enabled && prompt.trim().is_empty() {
+            bail!("请先填写激活器指令后再开启");
+        }
+        let updated = self.inner.store.update_activator(id, enabled, prompt).await?;
+        if enabled {
+            let mut active = self.inner.active.lock().await;
+            if !active.contains_key(id) {
+                let context = self.inner.store.context(id).await?;
+                if completed_boundary(&context).is_ok() {
+                    let instruction = format!(
+                        "[外部激活器持续指令 · 仅用户可手动开关，AI 无法修改或关闭]\n{}\n\n激活器当前处于开启状态：请持续遵循上述指令推进工作并验证结果，不要停止。",
+                        updated.activator_prompt
+                    );
+                    self.inner
+                        .store
+                        .append_context(id, vec![json!({"role":"user","content":instruction})])
+                        .await?;
+                    let cancel = CancellationToken::new();
+                    let run_id = new_id();
+                    self.inner.store.set_status(id, "running").await?;
+                    active.insert(
+                        id.to_owned(),
+                        Active {
+                            run_id: run_id.clone(),
+                            cancel: cancel.clone(),
+                            interrupt: CancellationToken::new(),
+                        },
+                    );
+                    drop(active);
+                    let _ = self
+                        .inner
+                        .files
+                        .begin_turn(&updated.id, &updated.cwd, &run_id)
+                        .await;
+                    self.launch(updated.clone(), run_id, cancel, false, None);
+                }
+            }
+        }
+        Ok(updated)
+    }
     pub async fn interrupt_message(&self, id: &str, client_id: &str) -> Result<Value> {
         let active = self.inner.active.lock().await;
         let result = self.inner.store.interrupt_message(id, client_id).await?;
@@ -1431,6 +1481,22 @@ impl Engine {
                     let instruction = format!(
                         "Continue the active long task. Goal id: {}\nTitle: {}\nObjective: {}\nLatest progress: {}\nThe task is not finished merely because you produced a reply. Continue useful work, verify outcomes, update progress with the goal tool, and call goal complete with evidence ONLY when the objective is actually achieved. If blocked by ambiguity, use ask_user with blocking=true. User pause/stop must be respected.",
                         goal.id, goal.title, goal.objective, goal.progress
+                    );
+                    self.inner
+                        .store
+                        .append_context(
+                            &session.id,
+                            vec![json!({"role":"user","content":instruction})],
+                        )
+                        .await?;
+                    tokio::select! {_=cancel.cancelled()=>bail!("Cancelled"),_=tokio::time::sleep(Duration::from_millis(500))=>{}}
+                    continue;
+                }
+                let latest_session = self.inner.store.session(&session.id).await?;
+                if latest_session.activator_enabled && !latest_session.activator_prompt.trim().is_empty() {
+                    let instruction = format!(
+                        "[外部激活器持续指令 · 仅用户可手动开关，AI 无法修改或关闭]\n{}\n\n激活器当前处于开启状态：请持续遵循上述指令推进工作并验证结果，不要停止。",
+                        latest_session.activator_prompt
                     );
                     self.inner
                         .store

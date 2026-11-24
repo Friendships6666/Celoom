@@ -149,7 +149,7 @@ function SubagentSettings({ config, onChange }: { config: AppConfig; onChange: (
   const change = (index: number, entry: SubagentModel) => onChange(pool.map((current, i) => i === index ? entry : current));
   function add() {
     const option = options[0];
-    if (option && pool.length < poolLimit) onChange([...pool, { id: crypto.randomUUID(), name: `预设 ${pool.length + 1}`, selection: option.selection, reasoning_effort: null }]);
+    if (option && pool.length < poolLimit) onChange([...pool, { id: crypto.randomUUID(), name: `预设 ${pool.length + 1}`, selection: option.selection, reasoning_effort: null, note: '' }]);
   }
   return <section className="subagent-settings" aria-label="子代理模型池">
     <div className="section-heading"><div><p className="section-eyebrow">SUBAGENTS / 子代理</p><h3>为任务准备合适的模型</h3><p className="muted">添加模型与思考等级预设，供子代理按任务选择。未指定预设时，沿用父会话。</p></div><span className="pool-count">{pool.length}<small> / {poolLimit}</small></span></div>
@@ -162,6 +162,7 @@ function SubagentSettings({ config, onChange }: { config: AppConfig; onChange: (
       return <article className={`pool-entry ${!selected ? 'invalid' : ''}`} key={entry.id} aria-label={`子代理预设 ${index + 1}`}>
         <span className="pool-entry-index"><GitBranch size={16} /><small>{String(index + 1).padStart(2, '0')}</small></span>
         <div className="pool-entry-fields"><Field label="预设名称"><input value={entry.name} onChange={event => change(index, { ...entry, name: event.target.value })} placeholder="例如：快速检查 / 深度分析" /></Field>
+          <Field label="备注（AI 可见）"><input value={entry.note ?? ''} onChange={event => change(index, { ...entry, note: event.target.value })} placeholder="例如：高智商模型 / 低智商模型 / 高价格模型" /></Field>
           <Field label="模型连接"><ModelSelect config={config} value={entry.selection} label={`预设 ${index + 1} 模型连接`} onChange={selection => change(index, selectSubagentModel(entry, selection))} /></Field>
           <Field label="思考等级"><select value={effortValue} aria-label={`预设 ${index + 1} 思考等级`} onChange={event => change(index, { ...entry, reasoning_effort: event.target.value === 'default' ? null : event.target.value === 'omit' ? '' : event.target.value.slice(7) })}>
             <option value="default">模型默认{selected?.model.reasoning_effort ? ` · ${selected.model.reasoning_effort}` : ''}</option><option value="omit">不发送思考等级</option>

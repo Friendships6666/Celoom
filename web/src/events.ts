@@ -49,6 +49,9 @@ export function sessionFromEvent(current: Session, event: AgentEvent): Session {
   if (event.type === 'session_settings' && isRecord(d.selection) && ['site_id', 'key_id', 'model_id'].every(key => typeof (d.selection as Record<string, unknown>)[key] === 'string') && (d.reasoning_effort === null || typeof d.reasoning_effort === 'string')) {
     return { ...current, selection: { site_id: str(d.selection.site_id), key_id: str(d.selection.key_id), model_id: str(d.selection.model_id) }, reasoning_effort: d.reasoning_effort, updated_at: event.created_at };
   }
+  if (event.type === 'activator' && typeof d.enabled === 'boolean') {
+    return { ...current, activator_enabled: d.enabled, activator_prompt: typeof d.prompt === 'string' ? d.prompt : (current.activator_prompt ?? ''), updated_at: event.created_at };
+  }
   return current;
 }
 export function timeline(events: AgentEvent[]): TimelineItem[] {

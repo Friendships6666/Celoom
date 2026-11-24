@@ -52,7 +52,7 @@ pub fn catalog(config: &AppConfig) -> Result<Value> {
         if key.secret.as_ref().is_none_or(|s| s.is_empty()) {
             bail!("Subagent pool key is not configured");
         }
-        entries.push(json!({"model_id":entry.id,"name":entry.name,"site_name":site.name,"model_name":model.name,"model":model.model,"reasoning_effort":entry.reasoning_effort.as_ref().unwrap_or(&model.reasoning_effort),"supports_images":model.supports_images,"context_window":model.context_window,"max_output_tokens":model.max_output_tokens}));
+        entries.push(json!({"model_id":entry.id,"name":entry.name,"note":entry.note,"site_name":site.name,"model_name":model.name,"model":model.model,"reasoning_effort":entry.reasoning_effort.as_ref().unwrap_or(&model.reasoning_effort),"supports_images":model.supports_images,"context_window":model.context_window,"max_output_tokens":model.max_output_tokens}));
     }
     Ok(json!({"inherit_available":true,"choices":entries}))
 }
@@ -88,6 +88,7 @@ mod tests {
                     model_id: "m".into(),
                 },
                 reasoning_effort: Some("high".into()),
+                note: "高智商模型".into(),
             }],
             ..Default::default()
         };
@@ -105,6 +106,8 @@ mod tests {
             context_epoch: 0,
             encryption: "none".into(),
             locked: false,
+            activator_enabled: false,
+            activator_prompt: String::new(),
         };
         (cfg, s)
     }

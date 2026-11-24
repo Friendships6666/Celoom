@@ -366,6 +366,10 @@ fn app(state: AppState) -> Router {
             "/api/sessions/{id}/settings",
             patch(update_session_settings),
         )
+        .route(
+            "/api/sessions/{id}/activator",
+            patch(update_session_activator),
+        )
         .route("/api/sessions/{id}/files", get(session_files))
         .route("/api/sessions/{id}/file", get(preview_file))
         .route("/api/sessions/{id}/export", get(export_session))
@@ -1127,6 +1131,25 @@ async fn update_session_settings(
         state
             .store
             .update_session_settings(&id, body.selection, body.reasoning_effort)
+            .await?,
+    ))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SessionActivatorBody {
+    enabled: bool,
+    #[serde(default)]
+    prompt: String,
+}
+async fn update_session_activator(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<SessionActivatorBody>,
+) -> ApiResult<Json<Session>> {
+    Ok(Json(
+        state
+            .engine
+            .update_activator(&id, body.enabled, &body.prompt)
             .await?,
     ))
 }

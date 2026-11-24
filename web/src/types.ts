@@ -18,7 +18,7 @@ export interface SearchConfig {
 export const defaultSearchConfig = (): SearchConfig => ({ provider: 'duckduckgo', base_url: '' });
 export interface AppConfig { revision: number; sites: Site[]; network: NetworkConfig; search?: SearchConfig; subagent_models?: SubagentModel[] }
 export interface Selection { site_id: string; key_id: string; model_id: string }
-export interface SubagentModel { id: string; name: string; selection: Selection; reasoning_effort: string | null }
+export interface SubagentModel { id: string; name: string; selection: Selection; reasoning_effort: string | null; note?: string }
 export interface SubagentSource { site_name?: string; model_name?: string; model?: string; reasoning_effort?: string | null; model_id?: string | null }
 export interface Question {
   id: string; session_id: string; call_id: string; question: string; blocking: boolean; options: string[];
@@ -34,6 +34,7 @@ export interface Session {
   id: string; title: string; cwd: string; selection: Selection; reasoning_effort: string | null; status: SessionStatus;
   created_at: string; updated_at: string; parent_id?: string | null; depth: number; context_epoch: number;
   encryption?: 'none' | 'half' | 'full'; locked?: boolean;
+  activator_enabled?: boolean; activator_prompt?: string;
 }
 export interface SessionSettings { selection: Selection; reasoning_effort: string | null }
 export interface AssistantSource { attempt_id: string; site_name: string; model_name: string; model: string; reasoning_effort: string | null }

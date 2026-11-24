@@ -45,6 +45,7 @@ export const api = {
   message: (id: string, input: MessageInput, signal?: AbortSignal) => request<{ run_id: string }>(`/sessions/${encodeURIComponent(id)}/messages`, 'POST', input, signal),
   interruptMessage: (id: string, client_message_id: string, signal?: AbortSignal) => request<InterruptionResult>(`/sessions/${encodeURIComponent(id)}/messages/interrupt`, 'POST', { client_message_id }, signal),
   sessionSettings: (id: string, settings: SessionSettings) => request<Session>(`/sessions/${encodeURIComponent(id)}/settings`, 'PATCH', settings),
+  setActivator: (id: string, body: { enabled: boolean; prompt: string }) => request<Session>(`/sessions/${encodeURIComponent(id)}/activator`, 'PATCH', body),
   files: (id: string, path = '', signal?: AbortSignal) => request<FileListing>(`/sessions/${encodeURIComponent(id)}/files?path=${encodeURIComponent(path)}`, 'GET', undefined, signal),
   questions: (id: string, signal?: AbortSignal) => request<Question[]>(`/sessions/${encodeURIComponent(id)}/questions`, 'GET', undefined, signal),
   answerQuestion: (id: string, questionId: string, answer: string) => request<Question>(`/sessions/${encodeURIComponent(id)}/questions/${encodeURIComponent(questionId)}/answer`, 'POST', { answer }),

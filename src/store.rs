@@ -108,6 +108,18 @@ impl Store {
         if !columns.iter().any(|c| c == "enc_meta") {
             db.execute("ALTER TABLE sessions ADD COLUMN enc_meta TEXT", [])?;
         }
+        if !columns.iter().any(|c| c == "activator_enabled") {
+            db.execute(
+                "ALTER TABLE sessions ADD COLUMN activator_enabled INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
+        if !columns.iter().any(|c| c == "activator_prompt") {
+            db.execute(
+                "ALTER TABLE sessions ADD COLUMN activator_prompt TEXT NOT NULL DEFAULT ''",
+                [],
+            )?;
+        }
         db.execute(
             "INSERT OR IGNORE INTO meta(key,value) VALUES('config',?1)",
             [serde_json::to_string(&AppConfig::default())?],
@@ -313,7 +325,7 @@ impl Store {
         depth: u32,
     ) -> Result<Session> {
         self.call(move |db| {
-            let s = Session { id:new_id(),title,cwd,selection,reasoning_effort:None,status:"idle".into(),created_at:now(),updated_at:now(),parent_id,depth,context_epoch:0,encryption:"none".into(),locked:false };
+            let s = Session { id:new_id(),title,cwd,selection,reasoning_effort:None,status:"idle".into(),created_at:now(),updated_at:now(),parent_id,depth,context_epoch:0,encryption:"none".into(),locked:false,activator_enabled:false,activator_prompt:String::new() };
             db.execute("INSERT INTO sessions(id,title,cwd,selection,status,created_at,updated_at,parent_id,depth,context_epoch) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)", params![s.id,s.title,s.cwd,serde_json::to_string(&s.selection)?,s.status,s.created_at,s.updated_at,s.parent_id,s.depth,s.context_epoch])?;
             Ok(s)
         }).await
@@ -1240,7 +1252,7 @@ fn load_config(db: &Connection) -> Result<AppConfig> {
     Ok(serde_json::from_str(&s)?)
 }
 pub(crate) fn load_session(db: &Connection, id: &str) -> Result<Session> {
-    let raw: (String, String, String, String, String, String, String, Option<String>, u32, u32, Option<String>, String) = db.query_row("SELECT id,title,cwd,selection,status,created_at,updated_at,parent_id,depth,context_epoch,reasoning_effort,encryption FROM sessions WHERE id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?,r.get(10)?,r.get(11)?))).optional()?.ok_or_else(||anyhow!("Session not found"))?;
+    let raw: (String, String, String, String, String, String, String, Option<String>, u32, u32, Option<String>, String, i64, String) = db.query_row("SELECT id,title,cwd,selection,status,created_at,updated_at,parent_id,depth,context_epoch,reasoning_effort,encryption,activator_enabled,activator_prompt FROM sessions WHERE id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?,r.get(10)?,r.get(11)?,r.get(12)?,r.get(13)?))).optional()?.ok_or_else(||anyhow!("Session not found"))?;
     let locked = raw.11 == "full" && with_vault(|v| Ok(v.get_full(&raw.0).is_none())).unwrap_or(true);
     Ok(Session {
         id: raw.0,
@@ -1256,7 +1268,39 @@ pub(crate) fn load_session(db: &Connection, id: &str) -> Result<Session> {
         reasoning_effort: raw.10,
         encryption: raw.11,
         locked,
+        activator_enabled: raw.12 != 0,
+        activator_prompt: raw.13,
     })
+}
+impl Store {
+    pub async fn update_activator(
+        &self,
+        id: &str,
+        enabled: bool,
+        prompt: &str,
+    ) -> Result<Session> {
+        ensure!(!prompt.contains('\0'), "Activator prompt contains NUL");
+        ensure!(prompt.len() <= 8192, "Activator prompt is too long (max 8192 bytes)");
+        let id = id.to_owned();
+        let prompt = prompt.to_owned();
+        self.call(move |db| {
+            let tx = db.transaction()?;
+            let updated = tx.execute(
+                "UPDATE sessions SET activator_enabled=?2, activator_prompt=?3, updated_at=?4 WHERE id=?1",
+                params![id, if enabled { 1 } else { 0 }, prompt, now()],
+            )?;
+            ensure!(updated == 1, "Session not found");
+            event(
+                &tx,
+                &id,
+                "activator",
+                json!({"enabled": enabled, "prompt": prompt}),
+            )?;
+            tx.commit()?;
+            load_session(db, &id)
+        })
+        .await
+    }
 }
 pub(crate) fn event(tx: &Transaction<'_>, id: &str, kind: &str, data: Value) -> Result<Event> {
     let created_at = now();
@@ -1471,6 +1515,10 @@ pub fn validate_config(c: &AppConfig) -> Result<()> {
                 && preset.name.len() <= 128
                 && !preset.name.contains('\0'),
             "Subagent choice needs a name of at most 128 bytes"
+        );
+        ensure!(
+            preset.note.len() <= 256 && !preset.note.contains('\0'),
+            "Subagent note must be at most 256 bytes"
         );
         let site=c.sites.iter().find(|site|site.id==preset.selection.site_id).with_context(||format!("Subagent choice '{}' references a removed site; update the subagent model pool",preset.name))?;
         let key = site
@@ -1756,6 +1804,7 @@ mod tests {
             name: "Reviewer".into(),
             selection: selection.clone(),
             reasoning_effort: Some("high".into()),
+            note: String::new(),
         }];
         validate_config(&config).unwrap();
         config.subagent_models[0].reasoning_effort = Some("unsupported".into());

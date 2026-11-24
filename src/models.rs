@@ -191,6 +191,8 @@ pub struct SubagentModel {
     pub selection: Selection,
     #[serde(default)]
     pub reasoning_effort: Option<String>,
+    #[serde(default)]
+    pub note: String,
 }
 
 fn default_encryption() -> String {
@@ -216,6 +218,10 @@ pub struct Session {
     pub encryption: String,
     #[serde(default)]
     pub locked: bool,
+    #[serde(default)]
+    pub activator_enabled: bool,
+    #[serde(default)]
+    pub activator_prompt: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

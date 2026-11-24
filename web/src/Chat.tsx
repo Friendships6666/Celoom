@@ -406,6 +406,15 @@ export function Chat({ session, events, model, config, connection, error, onRelo
               <InfinityIcon size={15} />
               <strong>外部激活器</strong>
               <span className={`activator-badge ${session.activator_enabled ? 'on' : ''}`}>{session.activator_enabled ? '运行中 · 永不停止' : '已关闭'}</span>
+              <button
+                type="button"
+                className="icon-button activator-fold"
+                aria-label="收起外部激活器"
+                title="收起"
+                onClick={() => setActivatorOpen(false)}
+              >
+                <X size={15} />
+              </button>
             </div>
             <small>完全外部控制，AI 无法读取或关闭；开启后每次回复结束都会自动按指令继续</small>
           </div>

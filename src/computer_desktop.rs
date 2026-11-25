@@ -366,7 +366,7 @@ impl DesktopController {
                     session.last_capture = Some(Instant::now());
                     Ok(ComputerOutput {
                         text: format!(
-                            "EXPLICIT HOST screenshot {}x{}. Physical pixels; requires scale=1 for coordinates. Host AT-SPI is intentionally unavailable; this is not the isolated desktop.",
+                            "EXPLICIT HOST screenshot {}x{}; coordinates are logical pixels. Host AT-SPI is intentionally unavailable; this is not the isolated desktop.",
                             image.width, image.height
                         ),
                         image: Some(image),
@@ -397,10 +397,10 @@ impl DesktopController {
                 }
                 "click_text" => {
                     let query = action.text.as_deref().filter(|s| !s.trim().is_empty()).context("click_text requires text")?;
-                    let image = capture_workspace(&session.bus).await?;
-                    let geometry = (image.width, image.height);
+                    let before = capture_workspace(&session.bus).await?;
+                    let geometry = (before.width, before.height);
                     session.geometry = Some(geometry);
-                    let ocr = run_vision(&image.png, &["ocr"]).await?;
+                    let ocr = run_vision(&before.png, &["ocr"]).await?;
                     let (matched, cx, cy, bbox) = pick_ocr_match(&ocr, query)?;
                     let click_action = ComputerAction {
                         action: "click".into(), target: action.target.clone(), ref_id: None, url: None,
@@ -415,16 +415,32 @@ impl DesktopController {
                         send_input_scoped(&socket, commands, true, token, emergency, Some(geometry))
                     })
                     .await??;
-                    session.last_capture = None;
-                    Ok(text_output(json!({"ok":true,"action":"click_text","target":"host","matched_text":matched,"cx":cx,"cy":cy,"bbox":bbox}).to_string()))
+                    let (screen_changed, changed_percent, after) =
+                        verify_host_input_after(&session.bus, Some(&before), Some((cx, cy))).await;
+                    session.last_capture = Some(Instant::now());
+                    Ok(ComputerOutput {
+                        text: json!({
+                            "ok": true,
+                            "action": "click_text",
+                            "target": "host",
+                            "matched_text": matched,
+                            "cx": cx,
+                            "cy": cy,
+                            "bbox": bbox,
+                            "screen_changed": screen_changed,
+                            "changed_percent": changed_percent,
+                            "note": format!("Clicked ({cx}, {cy}); screenshot marks click target with a red crosshair")
+                        }).to_string(),
+                        image: after,
+                    })
                 }
                 "click_color" => {
                     let color = action.color.as_deref().context("click_color requires color (#RRGGBB or R,G,B)")?;
                     let tol = action.delta.unwrap_or(24).clamp(0, 255).to_string();
-                    let image = capture_workspace(&session.bus).await?;
-                    let geometry = (image.width, image.height);
+                    let before = capture_workspace(&session.bus).await?;
+                    let geometry = (before.width, before.height);
                     session.geometry = Some(geometry);
-                    let found = run_vision(&image.png, &["find_color", color, &tol]).await?;
+                    let found = run_vision(&before.png, &["find_color", color, &tol]).await?;
                     let cluster = found["clusters"].as_array().and_then(|a| a.first()).context("No matching color cluster found on screen")?;
                     let cx = cluster["cx"].as_i64().context("Missing cluster cx")? as i32;
                     let cy = cluster["cy"].as_i64().context("Missing cluster cy")? as i32;
@@ -441,8 +457,24 @@ impl DesktopController {
                         send_input_scoped(&socket, commands, true, token, emergency, Some(geometry))
                     })
                     .await??;
-                    session.last_capture = None;
-                    Ok(text_output(json!({"ok":true,"action":"click_color","target":"host","color":color,"cx":cx,"cy":cy,"cluster":cluster}).to_string()))
+                    let (screen_changed, changed_percent, after) =
+                        verify_host_input_after(&session.bus, Some(&before), Some((cx, cy))).await;
+                    session.last_capture = Some(Instant::now());
+                    Ok(ComputerOutput {
+                        text: json!({
+                            "ok": true,
+                            "action": "click_color",
+                            "target": "host",
+                            "color": color,
+                            "cx": cx,
+                            "cy": cy,
+                            "cluster": cluster,
+                            "screen_changed": screen_changed,
+                            "changed_percent": changed_percent,
+                            "note": format!("Clicked ({cx}, {cy}); screenshot marks click target with a red crosshair")
+                        }).to_string(),
+                        image: after,
+                    })
                 }
                 "click" | "double_click" | "right_click" | "scroll" | "key" | "type" => {
                     ensure!(
@@ -455,6 +487,7 @@ impl DesktopController {
                             .is_some_and(|t| t.elapsed() < Duration::from_secs(10)),
                         "Take a fresh explicit host screenshot before each input action"
                     );
+                    let before = capture_workspace(&session.bus).await.ok();
                     // Consume the observation before submitting a side effect;
                     // failure never licenses a blind repeat into changed focus.
                     session.last_capture = None;
@@ -467,9 +500,32 @@ impl DesktopController {
                         send_input_scoped(&socket, commands, true, token, emergency, Some(geometry))
                     })
                     .await??;
-                    Ok(text_output(
-                        json!({"ok":true,"action":action.action,"target":"host","x":action.x,"y":action.y,"key":action.key,"delta":action.delta,"note":"Input submitted to host desktop"}).to_string(),
-                    ))
+                    let target_xy = match (action.x, action.y) {
+                        (Some(x), Some(y)) => Some((x, y)),
+                        _ => None,
+                    };
+                    let (screen_changed, changed_percent, after) =
+                        verify_host_input_after(&session.bus, before.as_ref(), target_xy).await;
+                    let note = if let Some((x, y)) = target_xy {
+                        format!("Input submitted to host desktop; screenshot marks ({x}, {y}) with a red crosshair")
+                    } else {
+                        "Input submitted to host desktop".into()
+                    };
+                    Ok(ComputerOutput {
+                        text: json!({
+                            "ok": true,
+                            "action": action.action,
+                            "target": "host",
+                            "x": action.x,
+                            "y": action.y,
+                            "key": action.key,
+                            "delta": action.delta,
+                            "screen_changed": screen_changed,
+                            "changed_percent": changed_percent,
+                            "note": note
+                        }).to_string(),
+                        image: after,
+                    })
                 }
                 "fill" => bail!(
                     "Host AT-SPI fill is unavailable; fixed helper is restricted to private apps"
@@ -1189,6 +1245,26 @@ impl Session {
     }
 }
 
+async fn verify_host_input_after(
+    bus: &zbus::Connection,
+    before: Option<&ComputerImage>,
+    target_xy: Option<(i32, i32)>,
+) -> (bool, f64, Option<ComputerImage>) {
+    tokio::time::sleep(Duration::from_millis(140)).await;
+    let Ok(after) = capture_workspace(bus).await else {
+        return (false, 0.0, None);
+    };
+    let changed_percent = before
+        .map(|b| pixel_diff_percent(b, &after))
+        .unwrap_or(0.0);
+    let screen_changed = changed_percent >= 0.05;
+    let out_img = match target_xy {
+        Some((x, y)) => annotate_crosshair(&after, x, y).unwrap_or(after),
+        None => after,
+    };
+    (screen_changed, changed_percent, Some(out_img))
+}
+
 fn pixel_diff_percent(a: &ComputerImage, b: &ComputerImage) -> f64 {
     let (Ok(ia), Ok(ib)) = (
         image::load_from_memory(&a.png),
@@ -1606,22 +1682,38 @@ fn validate_host_outputs(
 ) -> Result<()> {
     ensure!(
         outputs.len() == 1,
-        "COORDINATE_MAPPING_UNSUPPORTED: host requires one output, scale1 and origin0,0"
+        "COORDINATE_MAPPING_UNSUPPORTED: host requires one output with origin 0,0"
     );
     let output = outputs.values().next().unwrap();
     ensure!(
         output.x == 0
             && output.y == 0
-            && output.scale == 1
+            && output.scale >= 1
             && output.normal
             && output.width > 0
             && output.height > 0,
-        "COORDINATE_MAPPING_UNSUPPORTED: scaled, rotated or offset host output"
+        "COORDINATE_MAPPING_UNSUPPORTED: rotated or offset host output"
     );
+    let (gw, gh) = geometry.context("COORDINATE_MAPPING_UNSUPPORTED: missing screenshot geometry")?;
     ensure!(
-        geometry == Some((output.width as u32, output.height as u32)),
-        "COORDINATE_MAPPING_UNSUPPORTED: screenshot geometry differs from current single-output mode"
+        gw > 0 && gh > 0 && gw <= output.width as u32 && gh <= output.height as u32,
+        "COORDINATE_MAPPING_UNSUPPORTED: screenshot geometry exceeds host output mode"
     );
+    if output.scale == 1 {
+        ensure!(
+            gw == output.width as u32 && gh == output.height as u32,
+            "COORDINATE_MAPPING_UNSUPPORTED: screenshot geometry differs from current single-output mode"
+        );
+    } else {
+        // HiDPI / fractional scaling: KWin CaptureWorkspace returns logical dimensions (gw, gh)
+        // matching the physical mode aspect ratio, and FakeInput uses those same logical coords.
+        let lhs = output.width as i64 * gh as i64;
+        let rhs = output.height as i64 * gw as i64;
+        ensure!(
+            (lhs - rhs).abs() <= (output.width.max(output.height) as i64) * 2,
+            "COORDINATE_MAPPING_UNSUPPORTED: scaled screenshot aspect ratio differs from output mode"
+        );
+    }
     Ok(())
 }
 impl Dispatch<wl_output::WlOutput, u32> for InputState {
@@ -1933,11 +2025,19 @@ mod tests {
         outputs.insert(2, normal.clone());
         assert!(validate_host_outputs(&outputs, Some((1280, 800))).is_err());
         outputs.remove(&2);
-        for invalid in [
+        outputs.insert(
+            1,
             OutputGeometry {
+                width: 2560,
+                height: 1600,
                 scale: 2,
                 ..normal.clone()
             },
+        );
+        assert!(validate_host_outputs(&outputs, Some((2048, 1280))).is_ok());
+        assert!(validate_host_outputs(&outputs, Some((1280, 800))).is_ok());
+        assert!(validate_host_outputs(&outputs, Some((800, 800))).is_err());
+        for invalid in [
             OutputGeometry {
                 x: -1280,
                 ..normal.clone()

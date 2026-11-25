@@ -6,23 +6,26 @@ import sys
 
 
 def run_ocr(png_path):
-    from PIL import Image
+    from PIL import Image, ImageOps
 
     with Image.open(png_path) as im:
         width, height = im.size
+        gray = im.convert("L")
 
-    def tsv_for_psm(psm):
-        proc = subprocess.run(
-            ["/usr/bin/tesseract", png_path, "stdout", "--psm", str(psm), "tsv"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+    def tsv_on_image(img, psm, ox=0, oy=0, scale=1):
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
+            img.save(tmp.name)
+            proc = subprocess.run(
+                ["/usr/bin/tesseract", tmp.name, "stdout", "--psm", str(psm), "tsv"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
         if proc.returncode != 0:
-            raise RuntimeError(proc.stderr.strip() or f"tesseract failed with {proc.returncode}")
-        items = []
-        lines = proc.stdout.splitlines()
-        for line in lines[1:]:
+            return []
+        out = []
+        for line in proc.stdout.splitlines()[1:]:
             cols = line.split("\t")
             if len(cols) < 12:
                 continue
@@ -31,15 +34,15 @@ def run_ocr(png_path):
                 continue
             try:
                 conf = float(cols[10])
-                x = int(cols[6])
-                y = int(cols[7])
-                w = int(cols[8])
-                h = int(cols[9])
+                x = int(cols[6]) // scale + ox
+                y = int(cols[7]) // scale + oy
+                w = max(1, int(cols[8]) // scale)
+                h = max(1, int(cols[9]) // scale)
             except ValueError:
                 continue
-            if w <= 0 or h <= 0 or conf < 0:
+            if conf < 10:
                 continue
-            items.append({
+            out.append({
                 "text": text,
                 "x": x,
                 "y": y,
@@ -49,18 +52,91 @@ def run_ocr(png_path):
                 "cy": y + h // 2,
                 "conf": round(conf, 1),
             })
-        return items
+        return out
 
-    items = tsv_for_psm(11)
-    if not items:
-        items = tsv_for_psm(3)
+    # Run 3x upscaled autocontrast OCR over overlapping 3x2 tiles so small UI fonts
+    # aren't drowned out by large images/photos, then deduplicate tile-border overlaps.
+    raw_items = []
+    cols_n, rows_n = 2, 3
+    pad = 40
+    scale = 3
+    for r in range(rows_n):
+        for c in range(cols_n):
+            x0 = max(0, c * (width // cols_n) - (pad if c > 0 else 0))
+            y0 = max(0, r * (height // rows_n) - (pad if r > 0 else 0))
+            x1 = min(width, (c + 1) * (width // cols_n) + (pad if c + 1 < cols_n else 0))
+            y1 = min(height, (r + 1) * (height // rows_n) + (pad if r + 1 < rows_n else 0))
+            crop = gray.crop((x0, y0, x1, y1))
+            up = ImageOps.autocontrast(
+                crop.resize((crop.width * scale, crop.height * scale), Image.Resampling.LANCZOS),
+                cutoff=1,
+            )
+            raw_items.extend(tsv_on_image(up, 6, ox=x0, oy=y0, scale=scale))
+
+    if len(raw_items) < 3:
+        up2 = ImageOps.autocontrast(
+            gray.resize((width * 2, height * 2), Image.Resampling.LANCZOS),
+            cutoff=1,
+        )
+        raw_items.extend(tsv_on_image(up2, 11, ox=0, oy=0, scale=2))
+
+    # Deduplicate overlapping tokens (keep higher confidence).
+    items = []
+    for it in sorted(raw_items, key=lambda d: -d["conf"]):
+        dup = False
+        for kept in items:
+            if (
+                abs(it["cx"] - kept["cx"]) <= max(12, min(it["w"], kept["w"]) // 2)
+                and abs(it["cy"] - kept["cy"]) <= max(8, min(it["h"], kept["h"]) // 2)
+            ):
+                dup = True
+                break
+        if not dup:
+            items.append(it)
+
+    items.sort(key=lambda d: (d["y"], d["x"]))
+
+    # Group words on the same horizontal line into phrase lines for multi-word click_text.
+    lines = []
+    for it in items:
+        placed = False
+        for ln in lines:
+            last = ln[-1]
+            same_row = abs(it["cy"] - last["cy"]) <= max(10, max(it["h"], last["h"]) * 0.75)
+            close_x = -8 <= (it["x"] - (last["x"] + last["w"])) <= max(48, last["h"] * 3)
+            if same_row and close_x:
+                ln.append(it)
+                placed = True
+                break
+        if not placed:
+            lines.append([it])
+
+    line_entries = []
+    for ln in lines:
+        ln.sort(key=lambda d: d["x"])
+        x0 = min(d["x"] for d in ln)
+        y0 = min(d["y"] for d in ln)
+        x1 = max(d["x"] + d["w"] for d in ln)
+        y1 = max(d["y"] + d["h"] for d in ln)
+        line_entries.append({
+            "text": " ".join(d["text"] for d in ln),
+            "x": x0,
+            "y": y0,
+            "w": x1 - x0,
+            "h": y1 - y0,
+            "cx": (x0 + x1) // 2,
+            "cy": (y0 + y1) // 2,
+            "conf": round(sum(d["conf"] for d in ln) / len(ln), 1),
+        })
+
     return {
         "ok": True,
         "width": width,
         "height": height,
         "count": len(items),
+        "lines": line_entries[:250],
         "items": items[:400],
-        "truncated": len(items) > 400,
+        "truncated": len(items) > 400 or len(line_entries) > 250,
     }
 
 

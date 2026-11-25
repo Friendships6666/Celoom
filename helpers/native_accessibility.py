@@ -144,6 +144,7 @@ def bridge():
                         walk(window, app, window, pid, None, 0)
         return {"generation": generation, "nodes": nodes,
                 "truncated": len(nodes) >= 512 or time.monotonic() - started > 1.2,
+                "coordinate_space": "window_local_on_wayland (rect is relative to window [0,0], NOT global screen coords; use ref_id for AT-SPI actions, or screenshot/ocr/click_text/click_color for global screen coords)",
                 "scope": "managed apps on private accessibility bus"}
 
     for line in sys.stdin:

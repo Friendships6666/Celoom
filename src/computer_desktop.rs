@@ -944,9 +944,9 @@ impl Session {
             }
             "click_text" => {
                 let query = action.text.as_deref().filter(|s| !s.trim().is_empty()).context("click_text requires text")?;
-                let image = self.screenshot().await?;
+                let before = self.screenshot().await?;
                 self.last_capture = Some(Instant::now());
-                let ocr = run_vision(&image.png, &["ocr"]).await?;
+                let ocr = run_vision(&before.png, &["ocr"]).await?;
                 let (matched, cx, cy, bbox) = pick_ocr_match(&ocr, query)?;
                 let click_action = ComputerAction {
                     action: "click".into(), target: action.target.clone(), ref_id: None, url: None,
@@ -956,14 +956,30 @@ impl Session {
                 let cmds = input_commands(&click_action)?;
                 let socket = self.root.join(&self.display);
                 tokio::task::spawn_blocking(move || send_input(&socket, cmds)).await??;
-                Ok(text_output(json!({"ok":true,"action":"click_text","target":"desktop","matched_text":matched,"cx":cx,"cy":cy,"bbox":bbox}).to_string()))
+                let (screen_changed, changed_percent, after) =
+                    self.verify_input_after(Some(&before), Some((cx, cy))).await;
+                Ok(ComputerOutput {
+                    text: json!({
+                        "ok": true,
+                        "action": "click_text",
+                        "target": "desktop",
+                        "matched_text": matched,
+                        "cx": cx,
+                        "cy": cy,
+                        "bbox": bbox,
+                        "screen_changed": screen_changed,
+                        "changed_percent": changed_percent,
+                        "note": format!("Clicked ({cx}, {cy}); screenshot marks click target with a red crosshair")
+                    }).to_string(),
+                    image: after,
+                })
             }
             "click_color" => {
                 let color = action.color.as_deref().context("click_color requires color (#RRGGBB or R,G,B)")?;
                 let tol = action.delta.unwrap_or(24).clamp(0, 255).to_string();
-                let image = self.screenshot().await?;
+                let before = self.screenshot().await?;
                 self.last_capture = Some(Instant::now());
-                let found = run_vision(&image.png, &["find_color", color, &tol]).await?;
+                let found = run_vision(&before.png, &["find_color", color, &tol]).await?;
                 let cluster = found["clusters"].as_array().and_then(|a| a.first()).context("No matching color cluster found on screen")?;
                 let cx = cluster["cx"].as_i64().context("Missing cluster cx")? as i32;
                 let cy = cluster["cy"].as_i64().context("Missing cluster cy")? as i32;
@@ -975,7 +991,23 @@ impl Session {
                 let cmds = input_commands(&click_action)?;
                 let socket = self.root.join(&self.display);
                 tokio::task::spawn_blocking(move || send_input(&socket, cmds)).await??;
-                Ok(text_output(json!({"ok":true,"action":"click_color","target":"desktop","color":color,"cx":cx,"cy":cy,"cluster":cluster}).to_string()))
+                let (screen_changed, changed_percent, after) =
+                    self.verify_input_after(Some(&before), Some((cx, cy))).await;
+                Ok(ComputerOutput {
+                    text: json!({
+                        "ok": true,
+                        "action": "click_color",
+                        "target": "desktop",
+                        "color": color,
+                        "cx": cx,
+                        "cy": cy,
+                        "cluster": cluster,
+                        "screen_changed": screen_changed,
+                        "changed_percent": changed_percent,
+                        "note": format!("Clicked ({cx}, {cy}); screenshot marks click target with a red crosshair")
+                    }).to_string(),
+                    image: after,
+                })
             }
             "handoff" => {
                 self.handoff.take();
@@ -1089,12 +1121,37 @@ impl Session {
                         "Take a fresh private screenshot/ocr before coordinate input"
                     );
                 }
+                let before = self.screenshot().await.ok();
                 let commands = input_commands(action)?;
                 let socket = self.root.join(&self.display);
                 tokio::task::spawn_blocking(move || send_input(&socket, commands)).await??;
-                Ok(text_output(
-                    json!({"ok":true,"action":action.action,"target":"desktop","x":action.x,"y":action.y,"key":action.key,"delta":action.delta,"note":"Input sent to private virtual compositor"}).to_string(),
-                ))
+                let target_xy = match (action.x, action.y) {
+                    (Some(x), Some(y)) => Some((x, y)),
+                    _ => None,
+                };
+                let (screen_changed, changed_percent, after) =
+                    self.verify_input_after(before.as_ref(), target_xy).await;
+                let note = if let Some((x, y)) = target_xy {
+                    format!("Input sent to private virtual compositor; screenshot marks ({x}, {y}) with a red crosshair")
+                } else {
+                    "Input sent to private virtual compositor".into()
+                };
+                Ok(ComputerOutput {
+                    text: json!({
+                        "ok": true,
+                        "action": action.action,
+                        "target": "desktop",
+                        "x": action.x,
+                        "y": action.y,
+                        "key": action.key,
+                        "delta": action.delta,
+                        "screen_changed": screen_changed,
+                        "changed_percent": changed_percent,
+                        "note": note
+                    })
+                    .to_string(),
+                    image: after,
+                })
             }
             _ => bail!("Unsupported private desktop action"),
         }
@@ -1110,6 +1167,89 @@ impl Session {
             ))
         })
     }
+    async fn verify_input_after(
+        &mut self,
+        before: Option<&ComputerImage>,
+        target_xy: Option<(i32, i32)>,
+    ) -> (bool, f64, Option<ComputerImage>) {
+        tokio::time::sleep(Duration::from_millis(140)).await;
+        let Ok(after) = self.screenshot().await else {
+            return (false, 0.0, None);
+        };
+        self.last_capture = Some(Instant::now());
+        let changed_percent = before
+            .map(|b| pixel_diff_percent(b, &after))
+            .unwrap_or(0.0);
+        let screen_changed = changed_percent >= 0.05;
+        let out_img = match target_xy {
+            Some((x, y)) => annotate_crosshair(&after, x, y).unwrap_or(after),
+            None => after,
+        };
+        (screen_changed, changed_percent, Some(out_img))
+    }
+}
+
+fn pixel_diff_percent(a: &ComputerImage, b: &ComputerImage) -> f64 {
+    let (Ok(ia), Ok(ib)) = (
+        image::load_from_memory(&a.png),
+        image::load_from_memory(&b.png),
+    ) else {
+        return 0.0;
+    };
+    let (ra, rb) = (ia.to_rgba8(), ib.to_rgba8());
+    let (ba, bb) = (ra.as_raw(), rb.as_raw());
+    if ba.len() != bb.len() || ba.is_empty() {
+        return 0.0;
+    }
+    let mut changed = 0usize;
+    let total = ba.len() / 4;
+    for (pa, pb) in ba.chunks_exact(4).zip(bb.chunks_exact(4)) {
+        let diff = (pa[0] as i32 - pb[0] as i32).abs()
+            + (pa[1] as i32 - pb[1] as i32).abs()
+            + (pa[2] as i32 - pb[2] as i32).abs();
+        if diff > 24 {
+            changed += 1;
+        }
+    }
+    ((changed as f64 * 100.0 / total as f64) * 100.0).round() / 100.0
+}
+
+fn annotate_crosshair(img: &ComputerImage, cx: i32, cy: i32) -> Result<ComputerImage> {
+    let mut rgba = image::load_from_memory(&img.png)?.to_rgba8();
+    let w = rgba.width() as i32;
+    let h = rgba.height() as i32;
+    let red = image::Rgba([255, 40, 40, 255]);
+    let white = image::Rgba([255, 255, 255, 255]);
+    for d in -14..=14 {
+        for off in -1..=1 {
+            if (0..w).contains(&(cx + d)) && (0..h).contains(&(cy + off)) {
+                rgba.put_pixel((cx + d) as u32, (cy + off) as u32, if off == 0 { red } else { white });
+            }
+            if (0..w).contains(&(cx + off)) && (0..h).contains(&(cy + d)) {
+                rgba.put_pixel((cx + off) as u32, (cy + d) as u32, if off == 0 { red } else { white });
+            }
+        }
+    }
+    for angle in 0..72 {
+        let theta = (angle as f64) * std::f64::consts::TAU / 72.0;
+        let px = cx + (10.0 * theta.cos()).round() as i32;
+        let py = cy + (10.0 * theta.sin()).round() as i32;
+        if (0..w).contains(&px) && (0..h).contains(&py) {
+            rgba.put_pixel(px as u32, py as u32, red);
+        }
+    }
+    let mut png = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut png).write_image(
+        rgba.as_raw(),
+        rgba.width(),
+        rgba.height(),
+        image::ExtendedColorType::Rgba8,
+    )?;
+    Ok(ComputerImage {
+        png,
+        width: img.width,
+        height: img.height,
+    })
 }
 async fn capture_workspace(bus: &zbus::Connection) -> Result<ComputerImage> {
     let fd = nix::sys::memfd::memfd_create(
@@ -1184,25 +1324,34 @@ async fn run_vision(png: &[u8], args: &[&str]) -> Result<Value> {
     serde_json::from_slice(&out.stdout).context("Invalid JSON from native vision helper")
 }
 
-fn pick_ocr_match(ocr: &Value, query: &str) -> Result<(String, i32, i32, Value)> {
-    let items = ocr["items"].as_array().context("OCR returned no items")?;
-    let q = query.trim().to_ascii_lowercase();
-    let best = items
-        .iter()
+fn find_in_ocr<'a>(arr: &'a [Value], q: &str) -> Option<&'a Value> {
+    arr.iter()
         .find(|it| it["text"].as_str().is_some_and(|t| t.trim().to_ascii_lowercase() == q))
         .or_else(|| {
-            items
-                .iter()
-                .find(|it| it["text"].as_str().is_some_and(|t| t.to_ascii_lowercase().contains(&q)))
-        });
+            arr.iter()
+                .find(|it| it["text"].as_str().is_some_and(|t| t.to_ascii_lowercase().contains(q)))
+        })
+}
+
+fn pick_ocr_match(ocr: &Value, query: &str) -> Result<(String, i32, i32, Value)> {
+    let q = query.trim().to_ascii_lowercase();
+    let lines = ocr["lines"].as_array();
+    let items = ocr["items"].as_array().context("OCR returned no items")?;
+    let best = lines
+        .and_then(|arr| find_in_ocr(arr, &q))
+        .or_else(|| find_in_ocr(items, &q));
     let Some(item) = best else {
-        let preview: Vec<_> = items
-            .iter()
-            .filter_map(|it| it["text"].as_str())
-            .take(20)
-            .collect();
+        let preview: Vec<_> = lines
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|it| it["text"].as_str())
+                    .take(20)
+                    .collect::<Vec<_>>()
+            })
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| items.iter().filter_map(|it| it["text"].as_str()).take(20).collect());
         bail!(
-            "OCR could not find text '{}'; visible OCR tokens include: {:?}",
+            "OCR could not find text '{}'; visible OCR lines include: {:?}",
             query,
             preview
         );
@@ -1641,12 +1790,14 @@ fn send_input_scoped(
     }
     let fake = state
         .fake
-        .as_ref()
+        .clone()
         .context("Private KWin does not expose fake_input v4")?;
     fake.authenticate(
         "Celoom private desktop".into(),
         "Input exclusively inside self-owned virtual compositor".into(),
     );
+    connection.flush()?;
+    bounded_roundtrip(&connection, &mut queue, &mut state)?;
     ensure!(
         !commands.iter().any(|c| matches!(c, Input::Keysym(..))) || fake.version() >= 6,
         "Native type requires fake_input v6; use accessibility fill on older KWin"
@@ -1663,7 +1814,11 @@ fn send_input_scoped(
             break;
         }
         match command {
-            Input::Move(x, y) => fake.pointer_motion_absolute(x, y),
+            Input::Move(x, y) => {
+                fake.pointer_motion_absolute(x, y);
+                connection.flush()?;
+                std::thread::sleep(Duration::from_millis(20));
+            }
             Input::Button(button, value) => {
                 fake.button(button, value);
                 if value == 1 {
@@ -1671,8 +1826,14 @@ fn send_input_scoped(
                 } else {
                     buttons.remove(&button);
                 }
+                connection.flush()?;
+                std::thread::sleep(Duration::from_millis(20));
             }
-            Input::Axis(value) => fake.axis(0, value),
+            Input::Axis(value) => {
+                fake.axis(0, value);
+                connection.flush()?;
+                std::thread::sleep(Duration::from_millis(10));
+            }
             Input::Key(key, value) => {
                 fake.keyboard_key(key, value);
                 if value == 1 {
@@ -1680,6 +1841,8 @@ fn send_input_scoped(
                 } else {
                     keys.remove(&key);
                 }
+                connection.flush()?;
+                std::thread::sleep(Duration::from_millis(10));
             }
             Input::Keysym(key, value) => {
                 fake.keyboard_keysym(key, value);
@@ -1688,9 +1851,10 @@ fn send_input_scoped(
                 } else {
                     symbols.remove(&key);
                 }
+                connection.flush()?;
+                std::thread::sleep(Duration::from_millis(5));
             }
         }
-        connection.flush()?;
     }
     for key in keys {
         fake.keyboard_key(key, 0);
@@ -1930,6 +2094,68 @@ mod tests {
                     .await
                     .is_err(),
                 "Lease hijack allowed"
+            );
+            Ok::<(), anyhow::Error>(())
+        }
+        .await;
+        controller.stop(None).await.unwrap();
+        result.unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore = "Tests real KWin FakeInput coordinate click on un-focused GTK fixture button"]
+    async fn real_private_desktop_coordinate_click_smoke() {
+        let controller = DesktopController::new(PathBuf::from("unused"));
+        let result = async {
+            let _ = controller
+                .execute("smoke", &action("screenshot"), CancellationToken::new())
+                .await?;
+            let helper = controller
+                .inner
+                .session
+                .lock()
+                .await
+                .as_ref()
+                .unwrap()
+                .root
+                .join("native_accessibility.py");
+            let mut launch = action("launch");
+            launch.argv = Some(vec![
+                "/usr/bin/python3".into(),
+                helper.to_string_lossy().into_owned(),
+                "fixture".into(),
+            ]);
+            controller
+                .execute("smoke", &launch, CancellationToken::new())
+                .await?;
+            for _ in 0..20 {
+                let response = controller
+                    .execute("smoke", &action("observe"), CancellationToken::new())
+                    .await?;
+                if response.text.contains("Fixture click") {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+            let ocr_out = controller
+                .execute("smoke", &action("ocr"), CancellationToken::new())
+                .await?;
+            eprintln!("OCR: {}", ocr_out.text);
+            let mut click_text = action("click_text");
+            click_text.text = Some("Fixture click".into());
+            let click_res = controller
+                .execute("smoke", &click_text, CancellationToken::new())
+                .await?;
+            eprintln!("CLICK_TEXT: {}", click_res.text);
+            ensure!(click_res.image.is_some(), "click_text should return annotated screenshot");
+            tokio::time::sleep(Duration::from_millis(150)).await;
+            let obs = controller
+                .execute("smoke", &action("observe"), CancellationToken::new())
+                .await?;
+            ensure!(
+                obs.text.contains("Fixture clicked"),
+                "Coordinate click_text did NOT click button! observe={}",
+                obs.text
             );
             Ok::<(), anyhow::Error>(())
         }

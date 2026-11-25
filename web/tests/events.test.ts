@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assistantLabel, fileMarkers, goalSnapshot, isRelativeFilePath, latestSequence, mergeEvents, mergeSnapshots, questionSnapshot, sessionFromEvent, subagentLabel, timeline, toolSummary } from '../src/events';
+import { assistantLabel, dagSavings, fileMarkers, goalSnapshot, isRelativeFilePath, latestSequence, mergeEvents, mergeSnapshots, questionSnapshot, sessionFromEvent, subagentLabel, timeline, toolSummary } from '../src/events';
 import { directoryRevisions } from '../src/Files';
 import { activeStatus, type AgentEvent, type Goal, type Question, type Session } from '../src/types';
 
@@ -37,6 +37,23 @@ describe('session routing and file event contracts', () => {
       event(2, 'assistant_message', { attempt_id: 'r1', text: 'Final answer', reasoning: 'Full thought' }),
     ]);
     expect(committed[0]).toMatchObject({ kind: 'assistant', text: 'Final answer', reasoning: 'Full thought', provisional: false });
+  });
+  it('dynamically measures DAG and parallel time savings from live session timestamps', () => {
+    const ev = (seq: number, type: string, data: Record<string, unknown>, created_at: string): AgentEvent => ({ seq, type, data, session_id: 's', created_at });
+    const stats = dagSavings([
+      ev(1, 'assistant_source', { attempt_id: 'a1' }, '2026-11-25T10:00:00.000Z'),
+      ev(2, 'assistant_message', { attempt_id: 'a1', text: '' }, '2026-11-25T10:00:10.000Z'),
+      ev(3, 'tool_start', { call_id: 'c1', name: 'dag', args: { nodes: [{ tool: 'web_fetch' }, { tool: 'web_fetch' }, { tool: 'bash' }] } }, '2026-11-25T10:00:10.000Z'),
+      ev(4, 'tool_end', { call_id: 'c1', name: 'dag', is_error: false, output: JSON.stringify({ duration_ms: 2000, nodes: [{ duration_ms: 2000 }, { duration_ms: 1500 }, { duration_ms: 1000 }] }) }, '2026-11-25T10:00:12.000Z'),
+    ]);
+    expect(stats).not.toBeNull();
+    // Measured RTT = 10s; 3 DAG nodes => 2 saved roundtrips (20s) + (4.5s - 2.0s) = 2.5s exec saved => 22.5s saved.
+    expect(stats!.medianRttSec).toBeCloseTo(10, 5);
+    expect(stats!.savedRoundtrips).toBe(2);
+    expect(stats!.savedExecSec).toBeCloseTo(2.5, 5);
+    expect(stats!.savedSec).toBeCloseTo(22.5, 5);
+    // actual = 10 + 2 = 12s; serial = 34.5s => 22.5 / 34.5 = 65.217%
+    expect(stats!.savedPct).toBeCloseTo((22.5 / 34.5) * 100, 2);
   });
   it('keeps actual files at every round end including empty rounds and rejects unsafe paths', () => {
     const result = timeline([event(1, 'user_message', { text: 'first' }), event(2, 'assistant_message', { attempt_id: 'a', text: 'done' }), event(3, 'turn_files', { run_id: 'first', files: [{ path: 'site/index.html', name: 'index.html', kind: 'new' }, { path: '../secret', name: 'secret', kind: 'new' }] }), event(4, 'user_message', { text: 'second' }), event(5, 'turn_files', { run_id: 'second', files: [] })]);

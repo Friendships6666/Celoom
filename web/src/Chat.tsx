@@ -6,7 +6,7 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { ArrowDown, ArrowUp, Brain, Check, ChevronRight, CircleAlert, CircleHelp, Code2, Copy, Eye, FolderOpen, GitBranch, Globe2, Image as ImageIcon, ImagePlus, Infinity as InfinityIcon, LoaderCircle, Minimize2, Monitor, Power, Search, Square, Target, Terminal, Workflow, X, Zap } from 'lucide-react';
 import { api, errorMessage } from './api';
-import { subagentLabel, timeline, toolSummary, type TimelineItem } from './events';
+import { dagSavings, subagentLabel, timeline, toolSummary, type TimelineItem } from './events';
 import { LogoMark } from './Logo';
 import { brandAccent, detectModelBrand } from './ModelAvatar';
 import { FileSidebar, TurnFilesCard } from './Files';
@@ -316,6 +316,7 @@ export function Chat({ session, events, model, config, connection, error, onRelo
   const usageCached = rawCached !== null && rawCached !== undefined && Number.isFinite(Number(rawCached)) ? Number(rawCached) : null;
   const cacheHitRate = usageCached !== null && usageInput > 0 ? (usageCached / usageInput) * 100 : null;
   const cacheHitLevel = cacheHitRate === null ? null : cacheHitRate >= 97 ? 'high' : cacheHitRate < 90 ? 'low' : 'mid';
+  const dagStats = useMemo(() => dagSavings(events), [events]);
   const contextWindow = Number(usage?.context_window) > 0 ? Number(usage?.context_window) : (model?.model.context_window ?? 0);
   const compactThresholdPct = Math.min(100, Math.max(20, model?.model.auto_compact_percent ?? 95));
   const compactThresholdRatio = compactThresholdPct / 100;
@@ -504,7 +505,7 @@ export function Chat({ session, events, model, config, connection, error, onRelo
             : `上下文 0% / ${compactThresholdPct}%`}
         </span>
       </div>
-      <div className="composer-footnote"><span>{connection === 'reconnecting' ? <><span className="connection-dot warning" />连接中断，正从最新事件重连</> : <><span className={`connection-dot ${connection === 'connected' ? '' : 'warning'}`} />{connection === 'connected' ? '已连接' : '未连接'}<span className="desktop-only"> · {running ? '断开页面不会取消任务' : 'Shift + Enter 换行'}</span></>}</span><div className="composer-footnote-actions">{usage && Number.isFinite(usageInput) && Number.isFinite(usageOutput) && <span className="usage-inline" title={`上下文窗口 ${usage.context_window} · 最大输出 ${usage.max_output_tokens}`}>输入 {usageInput.toLocaleString()} / 输出 {usageOutput.toLocaleString()}</span>}{cacheHitRate !== null && <span className={`cache-hit-badge ${cacheHitLevel}`} title={`缓存命中 ${usageCached?.toLocaleString()} / ${usageInput.toLocaleString()} (${cacheHitRate.toFixed(1)}%)`}>缓存 {cacheHitRate.toFixed(1)}%</span>}<button type="button" className="icon-button compact-button" onClick={() => void runAction('compact')} disabled={running || sending || action !== null || !hasUserMessage} title="手动压缩上下文" aria-label="手动压缩上下文">{action === 'compact' ? <LoaderCircle size={14} className="spin" /> : <Minimize2 size={14} />}</button></div></div>
+      <div className="composer-footnote"><span>{connection === 'reconnecting' ? <><span className="connection-dot warning" />连接中断，正从最新事件重连</> : <><span className={`connection-dot ${connection === 'connected' ? '' : 'warning'}`} />{connection === 'connected' ? '已连接' : '未连接'}<span className="desktop-only"> · {running ? '断开页面不会取消任务' : 'Shift + Enter 换行'}</span></>}</span><div className="composer-footnote-actions">{usage && Number.isFinite(usageInput) && Number.isFinite(usageOutput) && <span className="usage-inline" title={`上下文窗口 ${usage.context_window} · 最大输出 ${usage.max_output_tokens}`}>输入 {usageInput.toLocaleString()} / 输出 {usageOutput.toLocaleString()}</span>}{dagStats && <span className="dag-savings-badge" title={`动态基准：本会话实测中位往返 ${dagStats.medianRttSec.toFixed(1)}s · 省去 ${dagStats.savedRoundtrips} 次往返 + ${dagStats.savedExecSec.toFixed(1)}s 并发重叠执行（预计串行 ${dagStats.serialSec.toFixed(1)}s，实际 ${dagStats.actualSec.toFixed(1)}s）`}>DAG 省 {dagStats.savedPct.toFixed(1)}% · {dagStats.savedSec >= 100 ? Math.round(dagStats.savedSec) : dagStats.savedSec.toFixed(1)}s</span>}{cacheHitRate !== null && <span className={`cache-hit-badge ${cacheHitLevel}`} title={`缓存命中 ${usageCached?.toLocaleString()} / ${usageInput.toLocaleString()} (${cacheHitRate.toFixed(1)}%)`}>缓存 {cacheHitRate.toFixed(1)}%</span>}<button type="button" className="icon-button compact-button" onClick={() => void runAction('compact')} disabled={running || sending || action !== null || !hasUserMessage} title="手动压缩上下文" aria-label="手动压缩上下文">{action === 'compact' ? <LoaderCircle size={14} className="spin" /> : <Minimize2 size={14} />}</button></div></div>
     </div></div>
   </div>{preview && <ImageLightbox images={preview.images} initialIndex={preview.index} onClose={() => setPreview(null)} />}<FileSidebar sessionId={session.id} events={events} open={filesOpen} onClose={closeFiles} toggleRef={fileToggle} />{computerOpen && <ComputerPanel sessionId={session.id} events={events} authorizedBefore={computerAuthorized} onAuthorized={() => setComputerAuthorized(true)} onClose={() => setComputerOpen(false)} />}</div>;
 }

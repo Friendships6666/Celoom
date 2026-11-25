@@ -240,3 +240,134 @@ export function goalSnapshot(event: AgentEvent): Goal | null {
   const g = event.data.goal;
   return event.type === 'goal' && isRecord(g) && typeof g.id === 'string' && g.session_id === event.session_id && typeof g.title === 'string' && typeof g.objective === 'string' && typeof g.progress === 'string' && typeof g.rounds === 'number' && ['pending', 'active', 'paused', 'completed', 'cancelled'].includes(str(g.status)) && typeof g.updated_at === 'string' && typeof g.created_at === 'string' ? g as unknown as Goal : null;
 }
+
+export interface DagSavings {
+  savedPct: number;
+  savedSec: number;
+  savedExecSec: number;
+  savedRoundtrips: number;
+  medianRttSec: number;
+  actualSec: number;
+  serialSec: number;
+  dagCalls: number;
+}
+
+export function dagSavings(events: AgentEvent[]): DagSavings | null {
+  const reqStart = new Map<string, number>();
+  const llmDurs: number[] = [];
+  interface ToolRec {
+    name: string;
+    startMs: number | null;
+    endMs: number | null;
+    durSec: number;
+    isErr: boolean;
+    args: unknown;
+    output: string;
+  }
+  const turns: ToolRec[][] = [];
+  let curTurn: ToolRec[] | null = null;
+  const openTools = new Map<string, ToolRec>();
+
+  for (const ev of events) {
+    const d = ev.data;
+    const ms = Date.parse(ev.created_at);
+    const ts = Number.isFinite(ms) ? ms : null;
+    if (ev.type === 'assistant_source' && ts !== null) {
+      const aid = str(d.attempt_id);
+      if (aid) reqStart.set(aid, ts);
+    } else if (ev.type === 'assistant_message') {
+      const aid = str(d.attempt_id);
+      const st = aid ? reqStart.get(aid) : undefined;
+      if (st !== undefined && ts !== null && ts >= st) {
+        llmDurs.push((ts - st) / 1000);
+      }
+      curTurn = [];
+      turns.push(curTurn);
+    } else if (ev.type === 'tool_start') {
+      const cid = str(d.call_id);
+      const rec: ToolRec = { name: str(d.name), startMs: ts, endMs: null, durSec: 0, isErr: false, args: d.args, output: '' };
+      if (cid) openTools.set(cid, rec);
+      if (!curTurn) { curTurn = []; turns.push(curTurn); }
+      curTurn.push(rec);
+    } else if (ev.type === 'tool_end') {
+      const cid = str(d.call_id);
+      const rec = cid ? openTools.get(cid) : undefined;
+      if (rec) {
+        openTools.delete(cid);
+        rec.endMs = ts;
+        rec.durSec = ts !== null && rec.startMs !== null && ts >= rec.startMs ? (ts - rec.startMs) / 1000 : 0;
+        rec.isErr = d.is_error === true;
+        rec.output = str(d.output);
+      }
+    }
+  }
+
+  if (llmDurs.length === 0) return null;
+  const sortedLlm = [...llmDurs].sort((a, b) => a - b);
+  const mid = Math.floor(sortedLlm.length / 2);
+  const medianRttSec = sortedLlm.length % 2 === 1 ? sortedLlm[mid] : (sortedLlm[mid - 1] + sortedLlm[mid]) / 2;
+  const totalLlmSec = llmDurs.reduce((a, b) => a + b, 0);
+
+  let actualToolWallSec = 0;
+  let serialToolExecSec = 0;
+  let savedRoundtrips = 0;
+  let dagCalls = 0;
+
+  for (const batch of turns) {
+    if (!batch.length) continue;
+    let minStart = Infinity;
+    let maxEnd = -Infinity;
+    let sumDur = 0;
+    for (const item of batch) {
+      if (item.startMs !== null && item.startMs < minStart) minStart = item.startMs;
+      if (item.endMs !== null && item.endMs > maxEnd) maxEnd = item.endMs;
+      sumDur += item.durSec;
+    }
+    const batchWall = Number.isFinite(minStart) && Number.isFinite(maxEnd) && maxEnd >= minStart ? (maxEnd - minStart) / 1000 : sumDur;
+    actualToolWallSec += batchWall;
+    if (batch.length > 1) savedRoundtrips += batch.length - 1;
+
+    for (const item of batch) {
+      if (item.name === 'dag') {
+        dagCalls += 1;
+        if (item.isErr) {
+          serialToolExecSec += item.durSec;
+          continue;
+        }
+        let nodeCount = 0;
+        let innerSumSec = item.durSec;
+        try {
+          const parsedOut = JSON.parse(item.output) as { nodes?: Array<{ duration_ms?: number }> };
+          if (parsedOut && Array.isArray(parsedOut.nodes)) {
+            nodeCount = parsedOut.nodes.length;
+            innerSumSec = parsedOut.nodes.reduce((acc, n) => acc + (typeof n.duration_ms === 'number' && n.duration_ms > 0 ? n.duration_ms : 0), 0) / 1000;
+          }
+        } catch {
+          // Fallback to args.nodes if output is truncated or non-JSON.
+        }
+        if (nodeCount === 0 && isRecord(item.args)) {
+          const rawNodes = item.args.nodes;
+          if (Array.isArray(rawNodes)) nodeCount = rawNodes.length;
+          else if (typeof rawNodes === 'string') {
+            try {
+              const arr = JSON.parse(rawNodes);
+              if (Array.isArray(arr)) nodeCount = arr.length;
+            } catch { /* ignore */ }
+          }
+        }
+        if (nodeCount > 1) savedRoundtrips += nodeCount - 1;
+        serialToolExecSec += Math.max(innerSumSec, item.durSec);
+      } else {
+        serialToolExecSec += item.durSec;
+      }
+    }
+  }
+
+  if (dagCalls === 0 && savedRoundtrips === 0) return null;
+  const savedExecSec = Math.max(0, serialToolExecSec - actualToolWallSec);
+  const savedSec = savedExecSec + savedRoundtrips * medianRttSec;
+  const actualSec = totalLlmSec + actualToolWallSec;
+  const serialSec = actualSec + savedSec;
+  const savedPct = serialSec > 0 ? (savedSec / serialSec) * 100 : 0;
+  return { savedPct, savedSec, savedExecSec, savedRoundtrips, medianRttSec, actualSec, serialSec, dagCalls };
+}

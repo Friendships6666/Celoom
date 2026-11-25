@@ -1115,6 +1115,13 @@ impl Session {
                 if let Some(name) = host_env.socket.file_name() {
                     viewer_cmd.env("WAYLAND_DISPLAY", name);
                 }
+                let viewer_log_path = self.root.join("handoff_viewer.log");
+                let viewer_log = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .mode(0o600)
+                    .open(&viewer_log_path)?;
                 viewer_cmd
                     .arg("-I")
                     .arg("-c")
@@ -1125,10 +1132,15 @@ impl Session {
                     .arg(HEIGHT.to_string())
                     .stdin(Stdio::null())
                     .stdout(Stdio::null())
-                    .stderr(Stdio::null())
+                    .stderr(viewer_log)
                     .kill_on_drop(true)
                     .process_group(0);
-                let viewer = ManagedChild::new(viewer_cmd.spawn().context("Launch GTK3 handoff viewer on host")?);
+                let mut viewer = ManagedChild::new(viewer_cmd.spawn().context("Launch GTK3 handoff viewer on host")?);
+                tokio::time::sleep(Duration::from_millis(250)).await;
+                if let Ok(Some(status)) = viewer.try_wait() {
+                    let err_text = tokio::fs::read_to_string(&viewer_log_path).await.unwrap_or_default();
+                    bail!("Handoff viewer exited immediately ({status}): {}", err_text.trim());
+                }
                 let stop = CancellationToken::new();
                 let stop_bg = stop.clone();
                 let bus = self.bus.clone();

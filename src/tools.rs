@@ -130,19 +130,62 @@ pub struct GoalArgs {
     pub progress: Option<String>,
 }
 
+fn deserialize_dag_nodes<'de, D>(deserializer: D) -> std::result::Result<Vec<DagNode>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = Value::deserialize(deserializer)?;
+    let arr = match raw {
+        Value::Array(items) => Value::Array(items),
+        Value::String(s) => {
+            let trimmed = s.trim();
+            match serde_json::from_str::<Value>(trimmed) {
+                Ok(v) => v,
+                Err(_) => serde_json::from_str::<Value>(&repair_relaxed_json(trimmed))
+                    .map_err(serde::de::Error::custom)?,
+            }
+        }
+        other => {
+            return Err(serde::de::Error::custom(format!(
+                "DAG nodes must be an array, got {}",
+                other
+            )));
+        }
+    };
+    serde_json::from_value(arr).map_err(serde::de::Error::custom)
+}
+
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct DagNode {
     pub id: String,
     pub tool: String,
+    #[serde(default)]
     pub args: Value,
+    #[serde(default)]
     pub deps: Option<Vec<String>>,
+    #[serde(default)]
     pub on: Option<String>,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, Value>,
+}
+impl DagNode {
+    pub fn resolved_args(&self) -> Result<Value> {
+        let mut obj = match parse_dag_node_args(&self.args)? {
+            Value::Object(map) => map,
+            _ => unreachable!(),
+        };
+        for (k, v) in &self.extra {
+            obj.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        Ok(Value::Object(obj))
+    }
 }
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DagArgs {
+    #[serde(deserialize_with = "deserialize_dag_nodes")]
     pub nodes: Vec<DagNode>,
+    #[serde(default)]
     pub fail_fast: Option<bool>,
 }
 
@@ -595,9 +638,10 @@ fn validate_dag(dag: &DagArgs) -> Result<()> {
         {
             bail!("Invalid DAG branch condition on '{}': {cond}", node.id);
         }
-        let parsed_args = parse_dag_node_args(&node.args)
+        let parsed_args = node
+            .resolved_args()
             .with_context(|| format!("Invalid args on DAG node '{}'", node.id))?;
-        if !node.args.to_string().contains("{{") {
+        if !parsed_args.to_string().contains("{{") {
             validate(&node.tool, &parsed_args)
                 .with_context(|| format!("Invalid args for DAG node '{}'", node.id))?;
         }
@@ -748,7 +792,7 @@ pub fn schemas() -> Vec<Value> {
         ),
         function(
             "dag",
-            "Execute a Directed Acyclic Graph (DAG) of tool calls in parallel waves with conditional branching on upstream success/failure to minimize model roundtrips. Independent nodes run concurrently (set deps: null, on: null for root nodes); downstream nodes run once all deps finish and satisfy 'on' ('success' default | 'failure' | 'always'). String values in args may reference {{node_id.output}} or {{node_id.status}}. Allowed inner tools: read, write, edit, glob, grep, bash, job, web_search, web_fetch, computer. args is a JSON-encoded object string (e.g. \"{\\\"url\\\":\\\"...\\\"}\").",
+            "Execute a Directed Acyclic Graph (DAG) of tool calls in parallel waves with conditional branching on upstream success/failure to minimize model roundtrips. Independent nodes run concurrently; downstream nodes run once all deps finish and satisfy 'on' ('success' default | 'failure' | 'always'). String values in args may reference {{node_id.output}} or {{node_id.status}}. Allowed inner tools: read, write, edit, glob, grep, bash, job, web_search, web_fetch, computer. Pass args as a plain JSON object (NO stringifying or double-escaping needed), e.g. {\"url\":\"https://...\",\"max_chars\":8000}. Omit deps/on for root nodes.",
             json!({
                 "nodes": {
                     "type": "array",
@@ -757,11 +801,11 @@ pub fn schemas() -> Vec<Value> {
                         "properties": {
                             "id": {"type": "string"},
                             "tool": {"type": "string", "enum": ["read", "write", "edit", "glob", "grep", "bash", "job", "web_search", "web_fetch", "computer"]},
-                            "args": {"type": "string"},
+                            "args": {"type": "object", "additionalProperties": true},
                             "deps": {"type": ["array", "null"], "items": {"type": "string"}},
                             "on": {"type": ["string", "null"], "enum": ["success", "failure", "always", null]}
                         },
-                        "required": ["id", "tool", "args", "deps", "on"],
+                        "required": ["id", "tool", "args"],
                         "additionalProperties": false
                     }
                 },
@@ -1647,5 +1691,18 @@ mod tests {
             ]
         });
         assert!(validate("dag", &unescaped_controls_and_regex).is_ok());
+
+        let native_object_and_flat_args = json!({
+            "nodes": [
+                {"id": "f1", "tool": "web_fetch", "args": {"url": "https://example.com", "max_chars": 4000}},
+                {"id": "b1", "tool": "bash", "command": "echo hi", "deps": ["f1"]}
+            ]
+        });
+        assert!(validate("dag", &native_object_and_flat_args).is_ok());
+
+        let stringified_nodes = json!({
+            "nodes": "[{\"id\":\"s1\",\"tool\":\"web_search\",\"args\":{\"query\":\"rust\"}}]"
+        });
+        assert!(validate("dag", &stringified_nodes).is_ok());
     }
 }

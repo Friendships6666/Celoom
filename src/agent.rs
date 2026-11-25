@@ -2111,7 +2111,7 @@ impl Engine {
                 async move {
                     let t0 = Instant::now();
                     let res = async {
-                        let mut parsed = tools::parse_dag_node_args(&node.args)?;
+                        let mut parsed = node.resolved_args()?;
                         if !replacements.is_empty() {
                             Self::interpolate_dag_value(&mut parsed, &replacements);
                         }

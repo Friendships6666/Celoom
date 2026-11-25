@@ -185,9 +185,22 @@ export function toolSummary(name: string, args: unknown): string {
   if (tool === 'web_search') return first('query');
   if (tool === 'web_fetch') return first('url');
   if (tool === 'dag') {
-    const nodes = Array.isArray(a.nodes) ? a.nodes : [];
-    const ids = nodes.map(n => (isRecord(n) ? str(n.id) : '')).filter(Boolean);
-    return nodes.length ? `${nodes.length} 节点流水线${ids.length ? ` · ${ids.slice(0, 4).join(' → ')}${ids.length > 4 ? '…' : ''}` : ''}` : 'DAG 分支任务图';
+    let rawNodes = a.nodes;
+    if (typeof rawNodes === 'string') { try { rawNodes = JSON.parse(rawNodes); } catch { rawNodes = []; } }
+    const nodes = Array.isArray(rawNodes) ? rawNodes.filter(isRecord) : [];
+    if (!nodes.length) return 'DAG 分支任务图';
+    const parallelCount = nodes.filter(n => !Array.isArray(n.deps) || n.deps.length === 0).length;
+    const depCount = nodes.length - parallelCount;
+    const toolCounts = new Map<string, number>();
+    for (const n of nodes) {
+      const t = str(n.tool) || 'step';
+      toolCounts.set(t, (toolCounts.get(t) ?? 0) + 1);
+    }
+    const toolsText = [...toolCounts.entries()].map(([t, c]) => (c > 1 ? `${t}×${c}` : t)).join(', ');
+    const shape = depCount === 0
+      ? (nodes.length === 1 ? '单步执行' : `${nodes.length} 节点并发`)
+      : `${nodes.length} 节点 (${parallelCount} 并行 + ${depCount} 依赖)`;
+    return `${shape} · ${toolsText}`;
   }
   if (tool === 'grep') return first('pattern', 'query');
   if (tool === 'glob') return first('pattern');

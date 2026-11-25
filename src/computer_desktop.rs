@@ -21,7 +21,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, AsyncSeekExt, AsyncWriteExt, BufReader},
     process::{Child, ChildStdin, ChildStdout, Command},
     sync::Mutex,
 };
@@ -32,6 +32,8 @@ use wayland_client::{
 };
 
 const HELPER: &str = include_str!("../helpers/native_accessibility.py");
+const VISION_HELPER: &str = include_str!("../helpers/native_vision.py");
+const HANDOFF_HELPER: &str = include_str!("../helpers/desktop_handoff.py");
 const WIDTH: u32 = 1280;
 const HEIGHT: u32 = 800;
 const MAX_IMAGE: usize = 256 * 1024 * 1024;
@@ -117,15 +119,29 @@ impl Drop for ManagedChild {
         terminate(self);
     }
 }
+struct DesktopHandoff {
+    stop: CancellationToken,
+    viewer: ManagedChild,
+    task: tokio::task::JoinHandle<()>,
+}
+impl Drop for DesktopHandoff {
+    fn drop(&mut self) {
+        self.stop.cancel();
+        self.task.abort();
+        terminate(&mut self.viewer);
+    }
+}
 struct Session {
     owner: String,
     root: PathBuf,
     display: String,
     env: HashMap<String, String>,
+    host_env: Option<HostEnvironment>,
     compositor: ManagedChild,
     apps: Vec<ManagedChild>,
     registry: Option<ManagedChild>,
     bridge: Option<Bridge>,
+    handoff: Option<DesktopHandoff>,
     bus: zbus::Connection,
     cancel: CancellationToken,
     last_capture: Option<Instant>,
@@ -142,6 +158,7 @@ fn terminate(child: &mut ManagedChild) {
 impl Drop for Session {
     fn drop(&mut self) {
         self.cancel.cancel();
+        self.handoff.take();
         if let Some(bridge) = &mut self.bridge {
             terminate(&mut bridge.child);
         }
@@ -226,11 +243,13 @@ impl DesktopController {
         };
         json!({"supported_platform":"Linux KDE Wayland", "available":binary("kwin_wayland").is_some() && binary("dbus-run-session").is_some() && binary("python3").is_some() && Path::new("/usr/bin/prlimit").is_file(),
             "running":running,"owner":owner,"busy":guard.is_err(),"dependencies":dependencies,
-            "isolation":"private virtual KWin + private Wayland, D-Bus, runtime, HOME/config/cache; no host input",
-            "viewport":{"width":WIDTH,"height":HEIGHT},"native_accessibility":"fixed Python GI AT-SPI helper; runtime dependency checked on first observe",
-            "limits":{"apps":8,"operation_seconds":30,"accessibility_nodes":512,"raw_capture_bytes":MAX_IMAGE,"process_memory":"not hard-capped; capture allocations bounded, arbitrary native apps are not a resource sandbox"},
-            "host":{"available":self.inner.host_env.is_some(),"requires":"explicit main host lease + live physical input monitor + human idle gate", "accessibility":false,"launch":false,"reason":"Host uses constructor-captured socket/bus only; host observe is screenshot, private AT-SPI helper never reads host apps"},
-            "limitations":["Not a filesystem/network security sandbox", "Apps must support Wayland; X11-only apps unsupported", "AT-SPI coverage varies; coordinate fallback is private only", "No lockscreen, DRM or secure UI control"]})
+            "ocr_available":binary("tesseract").is_some(),"handoff_available":self.inner.host_env.is_some(),
+            "isolation":"private virtual KWin + private Wayland, D-Bus, isolated empty HOME/config/cache (does NOT contain host app logins; use action='handoff' on desktop for user login/2FA, then 'resume_headless')",
+            "viewport":{"width":WIDTH,"height":HEIGHT},"native_accessibility":"fixed Python GI AT-SPI helper",
+            "capabilities":["launch","observe","screenshot","ocr","click","double_click","right_click","click_text","find_color","click_color","fill","type","key","scroll","wait","handoff","resume_headless","stop"],
+            "limits":{"apps":8,"operation_seconds":30,"accessibility_nodes":512,"raw_capture_bytes":MAX_IMAGE},
+            "host":{"available":self.inner.host_env.is_some(),"requires":"explicit main host lease + live physical input monitor + human idle gate", "accessibility":false,"launch":false,"ocr":true,"color_click":true,"reason":"Host uses constructor-captured socket/bus only; host supports screenshot, ocr, click_text, find_color, click_color, wait, click, double_click, right_click, type, key, scroll"},
+            "limitations":["Not a filesystem/network security sandbox", "Apps must support Wayland; X11-only apps unsupported", "Private desktop starts with empty HOME; use handoff for user logins"]})
     }
     pub async fn stop(&self, owner: Option<&str>) -> Result<()> {
         // Signal before waiting for the operation mutex, so an in-flight operation releases it.
@@ -353,10 +372,82 @@ impl DesktopController {
                         image: Some(image),
                     })
                 }
-                "click" | "scroll" | "key" | "type" => {
+                "wait" => {
+                    let ms = action.delta.unwrap_or(500).clamp(1, 30_000) as u64;
+                    tokio::time::sleep(Duration::from_millis(ms)).await;
+                    Ok(text_output(
+                        json!({"ok":true,"action":"wait","target":"host","waited_ms":ms}).to_string(),
+                    ))
+                }
+                "ocr" => {
+                    let image = capture_workspace(&session.bus).await?;
+                    session.geometry = Some((image.width, image.height));
+                    session.last_capture = Some(Instant::now());
+                    let ocr = run_vision(&image.png, &["ocr"]).await?;
+                    Ok(text_output(ocr.to_string()))
+                }
+                "find_color" => {
+                    let color = action.color.as_deref().context("find_color requires color (#RRGGBB or R,G,B)")?;
+                    let tol = action.delta.unwrap_or(24).clamp(0, 255).to_string();
+                    let image = capture_workspace(&session.bus).await?;
+                    session.geometry = Some((image.width, image.height));
+                    session.last_capture = Some(Instant::now());
+                    let found = run_vision(&image.png, &["find_color", color, &tol]).await?;
+                    Ok(text_output(found.to_string()))
+                }
+                "click_text" => {
+                    let query = action.text.as_deref().filter(|s| !s.trim().is_empty()).context("click_text requires text")?;
+                    let image = capture_workspace(&session.bus).await?;
+                    let geometry = (image.width, image.height);
+                    session.geometry = Some(geometry);
+                    let ocr = run_vision(&image.png, &["ocr"]).await?;
+                    let (matched, cx, cy, bbox) = pick_ocr_match(&ocr, query)?;
+                    let click_action = ComputerAction {
+                        action: "click".into(), target: action.target.clone(), ref_id: None, url: None,
+                        text: None, x: Some(cx), y: Some(cy), key: None, button: action.button.clone(),
+                        delta: None, argv: None, max_nodes: None, max_depth: None, color: None,
+                    };
+                    let commands = input_commands_with_geometry(&click_action, geometry.0, geometry.1)?;
+                    let socket = env.socket.clone();
+                    let token = cancel.clone();
+                    let emergency = shutdown.clone();
+                    tokio::task::spawn_blocking(move || {
+                        send_input_scoped(&socket, commands, true, token, emergency, Some(geometry))
+                    })
+                    .await??;
+                    session.last_capture = None;
+                    Ok(text_output(json!({"ok":true,"action":"click_text","target":"host","matched_text":matched,"cx":cx,"cy":cy,"bbox":bbox}).to_string()))
+                }
+                "click_color" => {
+                    let color = action.color.as_deref().context("click_color requires color (#RRGGBB or R,G,B)")?;
+                    let tol = action.delta.unwrap_or(24).clamp(0, 255).to_string();
+                    let image = capture_workspace(&session.bus).await?;
+                    let geometry = (image.width, image.height);
+                    session.geometry = Some(geometry);
+                    let found = run_vision(&image.png, &["find_color", color, &tol]).await?;
+                    let cluster = found["clusters"].as_array().and_then(|a| a.first()).context("No matching color cluster found on screen")?;
+                    let cx = cluster["cx"].as_i64().context("Missing cluster cx")? as i32;
+                    let cy = cluster["cy"].as_i64().context("Missing cluster cy")? as i32;
+                    let click_action = ComputerAction {
+                        action: "click".into(), target: action.target.clone(), ref_id: None, url: None,
+                        text: None, x: Some(cx), y: Some(cy), key: None, button: action.button.clone(),
+                        delta: None, argv: None, max_nodes: None, max_depth: None, color: None,
+                    };
+                    let commands = input_commands_with_geometry(&click_action, geometry.0, geometry.1)?;
+                    let socket = env.socket.clone();
+                    let token = cancel.clone();
+                    let emergency = shutdown.clone();
+                    tokio::task::spawn_blocking(move || {
+                        send_input_scoped(&socket, commands, true, token, emergency, Some(geometry))
+                    })
+                    .await??;
+                    session.last_capture = None;
+                    Ok(text_output(json!({"ok":true,"action":"click_color","target":"host","color":color,"cx":cx,"cy":cy,"cluster":cluster}).to_string()))
+                }
+                "click" | "double_click" | "right_click" | "scroll" | "key" | "type" => {
                     ensure!(
                         action.ref_id.is_none(),
-                        "Host accessibility refs are unsupported; use explicit screenshot coordinates"
+                        "Host accessibility refs are unsupported; use explicit screenshot coordinates or ocr/click_text/click_color"
                     );
                     ensure!(
                         session
@@ -377,7 +468,7 @@ impl DesktopController {
                     })
                     .await??;
                     Ok(text_output(
-                        "EXPLICIT HOST input submitted under main's physical-input lease",
+                        json!({"ok":true,"action":action.action,"target":"host","x":action.x,"y":action.y,"key":action.key,"delta":action.delta,"note":"Input submitted to host desktop"}).to_string(),
                     ))
                 }
                 "fill" => bail!(
@@ -423,7 +514,7 @@ impl DesktopController {
             let started = tokio::select! {
                 _=cancel.cancelled()=>bail!("Desktop startup cancelled"),
                 _=session_cancel.cancelled()=>bail!("Desktop startup stopped"),
-                started=tokio::time::timeout(Duration::from_secs(20),Session::start(owner,session_cancel.clone()))=>started.context("Private desktop startup timed out")??,
+                started=tokio::time::timeout(Duration::from_secs(20),Session::start(owner,session_cancel.clone(),self.inner.host_env.clone()))=>started.context("Private desktop startup timed out")??,
             };
             *guard = Some(started);
         }
@@ -448,7 +539,11 @@ impl DesktopController {
 }
 
 impl Session {
-    async fn start(owner: &str, cancel: CancellationToken) -> Result<Self> {
+    async fn start(
+        owner: &str,
+        cancel: CancellationToken,
+        host_env: Option<HostEnvironment>,
+    ) -> Result<Self> {
         let kwin =
             binary("kwin_wayland").context("Install KWin Wayland for the private desktop")?;
         let dbus = binary("dbus-run-session")
@@ -462,7 +557,7 @@ impl Session {
             path: root.clone(),
             keep: false,
         };
-        let result = Self::start_at(owner, cancel, &root, &id, kwin, dbus, python).await;
+        let result = Self::start_at(owner, cancel, host_env, &root, &id, kwin, dbus, python).await;
         if result.is_ok() {
             cleanup.keep = true;
         }
@@ -471,6 +566,7 @@ impl Session {
     async fn start_at(
         owner: &str,
         cancel: CancellationToken,
+        host_env: Option<HostEnvironment>,
         root: &Path,
         id: &str,
         kwin: PathBuf,
@@ -641,6 +737,8 @@ impl Session {
             bus,
             cancel,
             last_capture: None,
+            host_env,
+            handoff: None,
         })
     }
     async fn shutdown(&mut self) {
@@ -765,23 +863,45 @@ impl Session {
                 );
                 let pid = child.id();
                 self.apps.push(child);
-                Ok(text_output(json!({"launched":argv[0],"pid":pid,"isolation":"private desktop; application is not a security sandbox"}).to_string()))
+                Ok(text_output(json!({"ok":true,"launched":argv[0],"pid":pid,"isolation":"private desktop with isolated empty HOME (does NOT contain host app logins); use handoff if user login/2FA is needed"}).to_string()))
+            }
+            "wait" => {
+                let ms = action.delta.unwrap_or(500).clamp(1, 30_000) as u64;
+                tokio::time::sleep(Duration::from_millis(ms)).await;
+                Ok(text_output(
+                    json!({"ok":true,"action":"wait","target":"desktop","waited_ms":ms}).to_string(),
+                ))
             }
             "observe" => Ok(text_output(
                 self.accessibility("observe", None, None).await?.to_string(),
             )),
             "fill" => {
-                let reference = action
-                    .ref_id
-                    .as_deref()
-                    .context("Native fill requires a current accessibility ref_id")?;
                 let text = action.text.as_deref().context("fill requires text")?;
                 ensure!(text.len() <= 65536, "Text exceeds limit");
-                Ok(text_output(
-                    self.accessibility("fill", Some(reference), Some(text))
-                        .await?
-                        .to_string(),
-                ))
+                if let Some(reference) = action.ref_id.as_deref() {
+                    return Ok(text_output(
+                        self.accessibility("fill", Some(reference), Some(text))
+                            .await?
+                            .to_string(),
+                    ));
+                }
+                let x = action.x.context("Desktop fill requires ref_id or (x, y) coordinates")?;
+                let y = action.y.context("Desktop fill requires ref_id or (x, y) coordinates")?;
+                let click_action = ComputerAction {
+                    action: "click".into(), target: action.target.clone(), ref_id: None, url: None,
+                    text: None, x: Some(x), y: Some(y), key: None, button: Some("left".into()),
+                    delta: None, argv: None, max_nodes: None, max_depth: None, color: None,
+                };
+                let type_action = ComputerAction {
+                    action: "type".into(), target: action.target.clone(), ref_id: None, url: None,
+                    text: Some(text.to_owned()), x: None, y: None, key: None, button: None,
+                    delta: None, argv: None, max_nodes: None, max_depth: None, color: None,
+                };
+                let mut cmds = input_commands(&click_action)?;
+                cmds.extend(input_commands(&type_action)?);
+                let socket = self.root.join(&self.display);
+                tokio::task::spawn_blocking(move || send_input(&socket, cmds)).await??;
+                Ok(text_output(json!({"ok":true,"action":"fill","target":"desktop","x":x,"y":y,"text_len":text.len()}).to_string()))
             }
             "click" if action.ref_id.is_some() => Ok(text_output(
                 self.accessibility("click", action.ref_id.as_deref(), None)
@@ -808,22 +928,172 @@ impl Session {
                     image: Some(image),
                 })
             }
-            "click" | "scroll" | "key" | "type" => {
-                if matches!(action.action.as_str(), "click" | "scroll")
+            "ocr" => {
+                let image = self.screenshot().await?;
+                self.last_capture = Some(Instant::now());
+                let ocr = run_vision(&image.png, &["ocr"]).await?;
+                Ok(text_output(ocr.to_string()))
+            }
+            "find_color" => {
+                let color = action.color.as_deref().context("find_color requires color (#RRGGBB or R,G,B)")?;
+                let tol = action.delta.unwrap_or(24).clamp(0, 255).to_string();
+                let image = self.screenshot().await?;
+                self.last_capture = Some(Instant::now());
+                let found = run_vision(&image.png, &["find_color", color, &tol]).await?;
+                Ok(text_output(found.to_string()))
+            }
+            "click_text" => {
+                let query = action.text.as_deref().filter(|s| !s.trim().is_empty()).context("click_text requires text")?;
+                let image = self.screenshot().await?;
+                self.last_capture = Some(Instant::now());
+                let ocr = run_vision(&image.png, &["ocr"]).await?;
+                let (matched, cx, cy, bbox) = pick_ocr_match(&ocr, query)?;
+                let click_action = ComputerAction {
+                    action: "click".into(), target: action.target.clone(), ref_id: None, url: None,
+                    text: None, x: Some(cx), y: Some(cy), key: None, button: action.button.clone(),
+                    delta: None, argv: None, max_nodes: None, max_depth: None, color: None,
+                };
+                let cmds = input_commands(&click_action)?;
+                let socket = self.root.join(&self.display);
+                tokio::task::spawn_blocking(move || send_input(&socket, cmds)).await??;
+                Ok(text_output(json!({"ok":true,"action":"click_text","target":"desktop","matched_text":matched,"cx":cx,"cy":cy,"bbox":bbox}).to_string()))
+            }
+            "click_color" => {
+                let color = action.color.as_deref().context("click_color requires color (#RRGGBB or R,G,B)")?;
+                let tol = action.delta.unwrap_or(24).clamp(0, 255).to_string();
+                let image = self.screenshot().await?;
+                self.last_capture = Some(Instant::now());
+                let found = run_vision(&image.png, &["find_color", color, &tol]).await?;
+                let cluster = found["clusters"].as_array().and_then(|a| a.first()).context("No matching color cluster found on screen")?;
+                let cx = cluster["cx"].as_i64().context("Missing cluster cx")? as i32;
+                let cy = cluster["cy"].as_i64().context("Missing cluster cy")? as i32;
+                let click_action = ComputerAction {
+                    action: "click".into(), target: action.target.clone(), ref_id: None, url: None,
+                    text: None, x: Some(cx), y: Some(cy), key: None, button: action.button.clone(),
+                    delta: None, argv: None, max_nodes: None, max_depth: None, color: None,
+                };
+                let cmds = input_commands(&click_action)?;
+                let socket = self.root.join(&self.display);
+                tokio::task::spawn_blocking(move || send_input(&socket, cmds)).await??;
+                Ok(text_output(json!({"ok":true,"action":"click_color","target":"desktop","color":color,"cx":cx,"cy":cy,"cluster":cluster}).to_string()))
+            }
+            "handoff" => {
+                self.handoff.take();
+                let host_env = self.host_env.clone().context("Host desktop display is unavailable for handoff viewer")?;
+                let python = binary("python3").context("python3 required for handoff viewer")?;
+                let frame_path = self.root.join("handoff_frame.png");
+                let input_path = self.root.join("handoff_input.jsonl");
+                let _ = tokio::fs::remove_file(&input_path).await;
+                if let Ok(img) = self.screenshot().await {
+                    let _ = tokio::fs::write(&frame_path, &img.png).await;
+                }
+                let mut viewer_cmd = Command::new(&python);
+                viewer_cmd
+                    .env_clear()
+                    .env("PATH", "/usr/local/bin:/usr/bin:/bin")
+                    .env("DBUS_SESSION_BUS_ADDRESS", &host_env.bus)
+                    .env("DBUS_STARTER_ADDRESS", &host_env.bus);
+                if let Some(dir) = host_env.socket.parent() {
+                    viewer_cmd.env("XDG_RUNTIME_DIR", dir);
+                }
+                if let Some(name) = host_env.socket.file_name() {
+                    viewer_cmd.env("WAYLAND_DISPLAY", name);
+                }
+                viewer_cmd
+                    .arg("-I")
+                    .arg("-c")
+                    .arg(HANDOFF_HELPER)
+                    .arg(&frame_path)
+                    .arg(&input_path)
+                    .arg(WIDTH.to_string())
+                    .arg(HEIGHT.to_string())
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .kill_on_drop(true)
+                    .process_group(0);
+                let viewer = ManagedChild::new(viewer_cmd.spawn().context("Launch GTK3 handoff viewer on host")?);
+                let stop = CancellationToken::new();
+                let stop_bg = stop.clone();
+                let bus = self.bus.clone();
+                let socket = self.root.join(&self.display);
+                let task = tokio::spawn(async move {
+                    let mut read_offset = 0u64;
+                    while !stop_bg.is_cancelled() {
+                        if let Ok(img) = capture_workspace(&bus).await {
+                            let tmp = frame_path.with_extension("tmp");
+                            if tokio::fs::write(&tmp, &img.png).await.is_ok() {
+                                let _ = tokio::fs::rename(&tmp, &frame_path).await;
+                            }
+                        }
+                        if let Ok(mut file) = tokio::fs::File::open(&input_path).await
+                            && file.seek(SeekFrom::Start(read_offset)).await.is_ok()
+                        {
+                            use tokio::io::AsyncReadExt;
+                            let mut buf = String::new();
+                            if let Ok(n) = file.read_to_string(&mut buf).await
+                                && n > 0
+                            {
+                                read_offset += n as u64;
+                                for line in buf.lines() {
+                                    if let Ok(ev) = serde_json::from_str::<Value>(line) {
+                                        let act = ComputerAction {
+                                            action: ev["action"].as_str().unwrap_or("").to_owned(),
+                                            target: Some("desktop".into()),
+                                            ref_id: None, url: None,
+                                            text: ev["text"].as_str().map(str::to_owned),
+                                            x: ev["x"].as_i64().map(|v| v as i32),
+                                            y: ev["y"].as_i64().map(|v| v as i32),
+                                            key: ev["key"].as_str().map(str::to_owned),
+                                            button: ev["button"].as_str().map(str::to_owned),
+                                            delta: ev["delta"].as_i64().map(|v| v as i32),
+                                            argv: None, max_nodes: None, max_depth: None, color: None,
+                                        };
+                                        if let Ok(cmds) = input_commands(&act) {
+                                            let sock = socket.clone();
+                                            let _ = tokio::task::spawn_blocking(move || send_input(&sock, cmds)).await;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        tokio::select! {
+                            _ = stop_bg.cancelled() => break,
+                            _ = tokio::time::sleep(Duration::from_millis(160)) => {}
+                        }
+                    }
+                });
+                self.handoff = Some(DesktopHandoff { stop, viewer, task });
+                Ok(text_output(json!({"ok":true,"action":"handoff","target":"desktop","message":"Interactive private desktop window opened on user's screen. Call ask_user(blocking=true) now so the user can complete login/2FA and click Continue, then call computer(target='desktop', action='resume_headless') to close the window and resume."}).to_string()))
+            }
+            "resume_headless" => {
+                self.handoff.take();
+                let image = self.screenshot().await?;
+                self.last_capture = Some(Instant::now());
+                Ok(ComputerOutput {
+                    text: format!(
+                        "Private desktop handoff closed and resumed ({}x{}). Logged-in state preserved.",
+                        image.width, image.height
+                    ),
+                    image: Some(image),
+                })
+            }
+            "click" | "double_click" | "right_click" | "scroll" | "key" | "type" => {
+                if matches!(action.action.as_str(), "click" | "double_click" | "right_click" | "scroll")
                     && (action.x.is_some() || action.y.is_some())
-                    || action.action == "click"
+                    || matches!(action.action.as_str(), "click" | "double_click" | "right_click")
                 {
                     ensure!(
                         self.last_capture
                             .is_some_and(|t| t.elapsed() < Duration::from_secs(120)),
-                        "Take a fresh private screenshot before coordinate input"
+                        "Take a fresh private screenshot/ocr before coordinate input"
                     );
                 }
                 let commands = input_commands(action)?;
                 let socket = self.root.join(&self.display);
                 tokio::task::spawn_blocking(move || send_input(&socket, commands)).await??;
                 Ok(text_output(
-                    "Input sent only to the private virtual compositor",
+                    json!({"ok":true,"action":action.action,"target":"desktop","x":action.x,"y":action.y,"key":action.key,"delta":action.delta,"note":"Input sent to private virtual compositor"}).to_string(),
                 ))
             }
             _ => bail!("Unsupported private desktop action"),
@@ -888,6 +1158,60 @@ async fn capture_workspace(bus: &zbus::Connection) -> Result<ComputerImage> {
     let mut raw = vec![0; required];
     file.read_exact(&mut raw)?;
     encode_capture(width, height, stride, format, &raw)
+}
+
+async fn run_vision(png: &[u8], args: &[&str]) -> Result<Value> {
+    let python = binary("python3").context("python3 required for native OCR/color vision")?;
+    let tmp = std::env::temp_dir().join(format!("celoom-vision-{}.png", uuid::Uuid::new_v4()));
+    tokio::fs::write(&tmp, png).await?;
+    let out = Command::new(python)
+        .arg("-I")
+        .arg("-c")
+        .arg(VISION_HELPER)
+        .args(args.iter().take(1))
+        .arg(&tmp)
+        .args(args.iter().skip(1))
+        .stdin(Stdio::null())
+        .output()
+        .await;
+    let _ = tokio::fs::remove_file(&tmp).await;
+    let out = out.context("Execute native vision helper")?;
+    ensure!(
+        out.status.success(),
+        "Native vision helper failed: {}",
+        String::from_utf8_lossy(&out.stderr).trim()
+    );
+    serde_json::from_slice(&out.stdout).context("Invalid JSON from native vision helper")
+}
+
+fn pick_ocr_match(ocr: &Value, query: &str) -> Result<(String, i32, i32, Value)> {
+    let items = ocr["items"].as_array().context("OCR returned no items")?;
+    let q = query.trim().to_ascii_lowercase();
+    let best = items
+        .iter()
+        .find(|it| it["text"].as_str().is_some_and(|t| t.trim().to_ascii_lowercase() == q))
+        .or_else(|| {
+            items
+                .iter()
+                .find(|it| it["text"].as_str().is_some_and(|t| t.to_ascii_lowercase().contains(&q)))
+        });
+    let Some(item) = best else {
+        let preview: Vec<_> = items
+            .iter()
+            .filter_map(|it| it["text"].as_str())
+            .take(20)
+            .collect();
+        bail!(
+            "OCR could not find text '{}'; visible OCR tokens include: {:?}",
+            query,
+            preview
+        );
+    };
+    let text = item["text"].as_str().unwrap_or("").to_owned();
+    let cx = item["cx"].as_i64().context("OCR missing cx")? as i32;
+    let cy = item["cy"].as_i64().context("OCR missing cy")? as i32;
+    let bbox = json!([item["x"], item["y"], item["w"], item["h"]]);
+    Ok((text, cx, cy, bbox))
 }
 
 fn validate_layout(width: u32, height: u32, stride: u32, format: u32) -> Result<usize> {
@@ -1052,19 +1376,27 @@ fn input_commands_with_geometry(
         commands.push(Input::Move(x as f64, y as f64));
     }
     match action.action.as_str() {
-        "click" => {
+        "click" | "right_click" | "double_click" => {
             ensure!(
                 action.x.is_some() && action.y.is_some(),
                 "Coordinate click requires x and y or accessibility ref_id"
             );
-            let button = match action.button.as_deref().unwrap_or("left") {
-                "left" => 272,
-                "right" => 273,
-                "middle" => 274,
-                _ => bail!("Unsupported mouse button"),
+            let button = if action.action == "right_click" {
+                273
+            } else {
+                match action.button.as_deref().unwrap_or("left") {
+                    "left" => 272,
+                    "right" => 273,
+                    "middle" => 274,
+                    _ => bail!("Unsupported mouse button"),
+                }
             };
             commands.push(Input::Button(button, 1));
             commands.push(Input::Button(button, 0));
+            if action.action == "double_click" {
+                commands.push(Input::Button(button, 1));
+                commands.push(Input::Button(button, 0));
+            }
         }
         "scroll" => {
             let delta = action.delta.context("scroll requires delta")?;
@@ -1402,6 +1734,9 @@ mod tests {
             button: None,
             delta: None,
             argv: None,
+            max_nodes: None,
+            max_depth: None,
+            color: None,
         }
     }
     #[test]

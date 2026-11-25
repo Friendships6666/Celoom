@@ -32,6 +32,9 @@ pub struct ComputerAction {
     pub button: Option<String>,
     pub delta: Option<i32>,
     pub argv: Option<Vec<String>>,
+    pub max_nodes: Option<u32>,
+    pub max_depth: Option<u32>,
+    pub color: Option<String>,
 }
 impl ComputerAction {
     pub fn target(&self) -> &str {
@@ -45,6 +48,8 @@ impl ComputerAction {
                     | "open"
                     | "observe"
                     | "click"
+                    | "double_click"
+                    | "right_click"
                     | "fill"
                     | "type"
                     | "key"
@@ -57,6 +62,10 @@ impl ComputerAction {
                     | "handoff"
                     | "resume_headless"
                     | "screenshot"
+                    | "ocr"
+                    | "click_text"
+                    | "find_color"
+                    | "click_color"
                     | "launch"
                     | "stop"
             ),
@@ -66,7 +75,7 @@ impl ComputerAction {
             matches!(self.target(), "browser" | "desktop" | "host"),
             "Unsupported computer target"
         );
-        for value in [&self.ref_id, &self.url, &self.key, &self.button] {
+        for value in [&self.ref_id, &self.url, &self.key, &self.button, &self.color] {
             ensure!(
                 value
                     .as_ref()
@@ -74,6 +83,14 @@ impl ComputerAction {
                 "Invalid computer argument"
             );
         }
+        ensure!(
+            self.max_nodes.is_none_or(|n| n <= 5000),
+            "max_nodes must be <= 5000 (0 = unlimited up to safety cap)"
+        );
+        ensure!(
+            self.max_depth.is_none_or(|d| d <= 64),
+            "max_depth must be <= 64 (0 = unlimited)"
+        );
         ensure!(
             self.text
                 .as_ref()
@@ -319,5 +336,60 @@ impl Computer {
             "Invalid screenshot file"
         );
         Ok(tokio::fs::read(path).await?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base_action(name: &str) -> ComputerAction {
+        ComputerAction {
+            action: name.into(),
+            target: Some("desktop".into()),
+            ref_id: None,
+            url: None,
+            text: None,
+            x: None,
+            y: None,
+            key: None,
+            button: None,
+            delta: None,
+            argv: None,
+            max_nodes: None,
+            max_depth: None,
+            color: None,
+        }
+    }
+
+    #[test]
+    fn validate_new_vision_and_input_actions() {
+        assert!(base_action("ocr").validate().is_ok());
+        assert!(base_action("double_click").validate().is_ok());
+        assert!(base_action("right_click").validate().is_ok());
+        assert!(base_action("unknown_action").validate().is_err());
+
+        let mut ct = base_action("click_text");
+        ct.text = Some("Sign in".into());
+        assert!(ct.validate().is_ok());
+
+        let mut fc = base_action("find_color");
+        fc.color = Some("#ff0000".into());
+        assert!(fc.validate().is_ok());
+        let mut cc = base_action("click_color");
+        cc.color = Some("255,0,0".into());
+        assert!(cc.validate().is_ok());
+
+        let mut obs = base_action("observe");
+        obs.target = Some("browser".into());
+        obs.max_nodes = Some(500);
+        obs.max_depth = Some(0);
+        assert!(obs.validate().is_ok());
+
+        obs.max_nodes = Some(5001);
+        assert!(obs.validate().is_err());
+        obs.max_nodes = Some(500);
+        obs.max_depth = Some(65);
+        assert!(obs.validate().is_err());
     }
 }

@@ -331,6 +331,9 @@ impl BrowserController {
                     button: None,
                     delta: None,
                     argv: None,
+                    max_nodes: None,
+                    max_depth: None,
+                    color: None,
                 };
                 return session.perform(&open_act, &cancel).await;
             }
@@ -1136,9 +1139,9 @@ impl BrowserSession {
                     );
                     tokio::select! { _=cancel.cancelled()=>bail!("Cancelled navigation"), _=tokio::time::sleep(Duration::from_millis(35))=>{} }
                 }
-                self.observe(cancel).await
+                self.observe(action.max_nodes, action.max_depth, cancel).await
             }
-            "observe" | "resume_headless" => self.observe(cancel).await,
+            "observe" | "resume_headless" => self.observe(action.max_nodes, action.max_depth, cancel).await,
             "screenshot" => self.screenshot(cancel).await,
             "click" => {
                 let (x, y, epoch) = if let Some(id) = action.ref_id.as_deref() {
@@ -1311,7 +1314,7 @@ impl BrowserSession {
                 )
                 .await?;
                 tokio::select! { _ = cancel.cancelled() => bail!("Cancelled"), _ = tokio::time::sleep(Duration::from_millis(500)) => {} }
-                self.observe(cancel).await
+                self.observe(None, None, cancel).await
             }
             "wait" => {
                 let ms = action.delta.unwrap_or(1500).clamp(100, 10000) as u64;
@@ -1339,7 +1342,7 @@ impl BrowserSession {
                 } else {
                     tokio::select! { _ = cancel.cancelled() => bail!("Cancelled"), _ = tokio::time::sleep(Duration::from_millis(ms)) => {} }
                 }
-                self.observe(cancel).await
+                self.observe(None, None, cancel).await
             }
             "eval" => {
                 let expr = action
@@ -1433,7 +1436,22 @@ impl BrowserSession {
         self.rpc("Input.dispatchKeyEvent", params, cancel).await?;
         Ok(())
     }
-    async fn observe(&mut self, cancel: &CancellationToken) -> Result<ComputerOutput> {
+    async fn observe(
+        &mut self,
+        max_nodes: Option<u32>,
+        max_depth: Option<u32>,
+        cancel: &CancellationToken,
+    ) -> Result<ComputerOutput> {
+        let node_cap: usize = match max_nodes {
+            Some(0) => 2000,
+            Some(n) => (n as usize).clamp(1, 2000),
+            None => 250,
+        };
+        let depth_cap: usize = match max_depth {
+            Some(0) => 64,
+            Some(d) => (d as usize).clamp(1, 64),
+            None => 12,
+        };
         self.refs.clear();
         self.snapshot = None;
         self.rpc("DOM.getDocument", json!({"depth":0,"pierce":true}), cancel)
@@ -1455,7 +1473,10 @@ impl BrowserSession {
             }
         }
         let snapshot = uuid::Uuid::new_v4().to_string();
-        let reply = self.rpc("Runtime.evaluate",json!({"expression":COLLECT_NODES,"objectGroup":"celoom-observe","returnByValue":false}),cancel).await?;
+        let collect_script = format!(
+            "(()=>{{const CAP={node_cap},MAX_D={depth_cap};let out=[];function scan(root,d){{if(d>MAX_D||out.length>=CAP)return;for(const e of root.children||[]){{if(out.length>=CAP)return;const s=getComputedStyle(e),r=e.getBoundingClientRect();if(s.display!=='none'&&s.visibility==='visible'&&r.width>0&&r.height>0&&!(e.tagName==='INPUT'&&e.type==='hidden')){{if(e.matches('a,button,input,textarea,select,summary,[role],[contenteditable],[tabindex],label,h1,h2,h3,h4')||e.onclick)out.push(e)}}if(e.shadowRoot)scan(e.shadowRoot,d+1);scan(e,d+1)}}}}scan(document.documentElement||document,0);return out}})()"
+        );
+        let reply = self.rpc("Runtime.evaluate",json!({"expression":collect_script,"objectGroup":"celoom-observe","returnByValue":false}),cancel).await?;
         ensure!(
             reply.get("exceptionDetails").is_none(),
             "DOM snapshot failed"
@@ -1521,7 +1542,7 @@ impl BrowserSession {
                 );
                 meta["ref_id"] = json!(id);
                 nodes.push(meta);
-                if nodes.len() >= MAX_REFS {
+                if nodes.len() >= node_cap {
                     break;
                 }
             }
@@ -1548,10 +1569,11 @@ impl BrowserSession {
             self.epoch == epoch,
             "STALE_SNAPSHOT: document changed during observation"
         );
-        let mut response = json!({"ok":true,"target":"browser","target_id":self.target,"snapshot_id":snapshot,"document_epoch":epoch,"page":page,"nodes":nodes,"node_limit":MAX_REFS,"refs_expire":"navigation, document replacement, next observe, or semantic element change","frame_scope":"main document and open shadow roots only; iframe contents are not represented","untrusted_content":true,"outcome":"observed"});
+        let total_collected = nodes.len();
+        let mut response = json!({"ok":true,"target":"browser","target_id":self.target,"snapshot_id":snapshot,"document_epoch":epoch,"page":page,"nodes":nodes,"total_collected":total_collected,"max_nodes":node_cap,"max_depth":depth_cap,"refs_expire":"navigation, document replacement, next observe, or semantic element change","frame_scope":"main document and open shadow roots only; iframe contents are not represented","untrusted_content":true,"outcome":"observed"});
         // Preserve complete JSON before the engine's text admission limit; never return
         // a truncated JSON suffix or references for nodes the model did not receive.
-        while response.to_string().len() > 22_000 {
+        while response.to_string().len() > 48_000 {
             let removed = response["nodes"].as_array_mut().unwrap().pop();
             if let Some(removed) = removed {
                 if let Some(id) = removed["ref_id"].as_str() {

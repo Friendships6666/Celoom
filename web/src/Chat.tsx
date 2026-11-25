@@ -161,8 +161,17 @@ const Markdown = memo(function Markdown({ text }: { text: string }) {
 });
 function timeLabel(time: string) { const date = new Date(time); return Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 function ToolCard({ item, running }: { item: Extract<TimelineItem, { kind: 'tool' }>; running: boolean }) {
-  const operation = toolSummary(item.name, item.args);
   const tool = item.name.replace(/^functions\./, '');
+  let operation = toolSummary(item.name, item.args);
+  if (tool === 'dag' && item.finished && item.output) {
+    try {
+      const parsed = JSON.parse(item.output) as { succeeded?: number; total?: number; duration_ms?: number };
+      if (typeof parsed.succeeded === 'number' && typeof parsed.total === 'number') {
+        const ms = typeof parsed.duration_ms === 'number' ? ` · ${parsed.duration_ms}ms` : '';
+        operation = `${operation} (${parsed.succeeded}/${parsed.total} 成功${ms})`;
+      }
+    } catch { /* ignore non-JSON output */ }
+  }
   const Icon = tool === 'dag' ? Workflow : tool === 'subagent' ? GitBranch : tool === 'computer' ? Monitor : tool === 'ask_user' ? CircleHelp : tool === 'goal' ? Target : tool === 'web_search' ? Search : tool === 'web_fetch' ? Globe2 : tool === 'read_image' ? ImageIcon : Terminal;
   return <details className={`tool-card ${item.error ? 'tool-error' : ''}`}><summary><span className="tool-icon"><Icon size={16} /></span><span className="tool-summary"><strong>{item.name || '工具调用'}</strong>{operation && <code className="tool-operation" title={operation}>{operation}</code>}<small>{item.finished ? item.error ? '执行失败' : '执行完成' : running ? '正在执行' : '未确认完成'}</small></span><span className="tool-result-icon">{item.finished ? item.error ? <CircleAlert size={15} /> : <Check size={15} /> : running ? <LoaderCircle size={15} className="spin" /> : <CircleAlert size={15} />}</span><ChevronRight size={15} className="details-chevron" /></summary><div className="tool-details"><span className="section-eyebrow">输入参数</span><pre>{tool === 'computer' ? safeComputerText(typeof item.args === 'string' ? item.args : JSON.stringify(item.args, null, 2) ?? '') : typeof item.args === 'string' ? item.args : JSON.stringify(item.args, null, 2)}</pre>{item.output !== undefined && <><span className="section-eyebrow">输出</span><pre>{item.output || '（无输出）'}</pre></>}{item.finished && item.capture?.capture_id && <ComputerCapture activity={item.capture} compact />}</div></details>;
 }

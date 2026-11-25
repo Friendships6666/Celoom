@@ -237,14 +237,28 @@ impl DesktopController {
     pub async fn status(&self) -> Value {
         let dependencies = json!({"kwin_wayland":binary("kwin_wayland"),"dbus_run_session":binary("dbus-run-session"),"python3":binary("python3"),"prlimit":binary("prlimit"),"atspi_registry":registry_binary()});
         let guard = self.inner.session.try_lock();
-        let (running, owner) = match &guard {
-            Ok(s) => (s.is_some(), s.as_ref().map(|s| s.owner.clone())),
-            Err(_) => (true, None),
+        let (running, owner, session_env) = match &guard {
+            Ok(s) => (
+                s.is_some(),
+                s.as_ref().map(|s| s.owner.clone()),
+                s.as_ref().map(|s| {
+                    json!({
+                        "HOME": s.env.get("HOME"),
+                        "XDG_DATA_HOME": s.env.get("XDG_DATA_HOME"),
+                        "XDG_CONFIG_HOME": s.env.get("XDG_CONFIG_HOME"),
+                        "XDG_CACHE_HOME": s.env.get("XDG_CACHE_HOME"),
+                        "XDG_RUNTIME_DIR": s.env.get("XDG_RUNTIME_DIR"),
+                        "WAYLAND_DISPLAY": s.env.get("WAYLAND_DISPLAY"),
+                    })
+                }),
+            ),
+            Err(_) => (true, None, None),
         };
         json!({"supported_platform":"Linux KDE Wayland", "available":binary("kwin_wayland").is_some() && binary("dbus-run-session").is_some() && binary("python3").is_some() && Path::new("/usr/bin/prlimit").is_file(),
-            "running":running,"owner":owner,"busy":guard.is_err(),"dependencies":dependencies,
+            "running":running,"owner":owner,"busy":guard.is_err(),"env":session_env,"dependencies":dependencies,
             "ocr_available":binary("tesseract").is_some(),"handoff_available":self.inner.host_env.is_some(),
-            "isolation":"private virtual KWin + private Wayland, D-Bus, isolated empty HOME/config/cache (does NOT contain host app logins; use action='handoff' on desktop for user login/2FA, then 'resume_headless')",
+            "handoff_note":"action='handoff' on desktop opens a normal viewer window on the user's screen (NO host takeover / NO HUMAN_ACTIVE idle gate required); follow with ask_user(blocking=true) then action='resume_headless'",
+            "isolation":"private virtual KWin + private Wayland, D-Bus, isolated empty HOME/XDG_DATA_HOME/XDG_CONFIG_HOME/XDG_CACHE_HOME (does NOT contain host app logins; use action='handoff' for user login/2FA, then 'resume_headless')",
             "viewport":{"width":WIDTH,"height":HEIGHT},"native_accessibility":"fixed Python GI AT-SPI helper",
             "capabilities":["launch","observe","screenshot","ocr","click","double_click","right_click","click_text","find_color","click_color","fill","type","key","scroll","wait","handoff","resume_headless","stop"],
             "limits":{"apps":8,"operation_seconds":30,"accessibility_nodes":512,"raw_capture_bytes":MAX_IMAGE},
@@ -919,7 +933,21 @@ impl Session {
                 );
                 let pid = child.id();
                 self.apps.push(child);
-                Ok(text_output(json!({"ok":true,"launched":argv[0],"pid":pid,"isolation":"private desktop with isolated empty HOME (does NOT contain host app logins); use handoff if user login/2FA is needed"}).to_string()))
+                let env_info = json!({
+                    "HOME": self.env.get("HOME"),
+                    "XDG_DATA_HOME": self.env.get("XDG_DATA_HOME"),
+                    "XDG_CONFIG_HOME": self.env.get("XDG_CONFIG_HOME"),
+                    "XDG_CACHE_HOME": self.env.get("XDG_CACHE_HOME"),
+                    "XDG_RUNTIME_DIR": self.env.get("XDG_RUNTIME_DIR"),
+                    "WAYLAND_DISPLAY": self.env.get("WAYLAND_DISPLAY"),
+                });
+                Ok(text_output(json!({
+                    "ok": true,
+                    "launched": argv[0],
+                    "pid": pid,
+                    "env": env_info,
+                    "isolation": "private desktop uses isolated empty HOME and XDG_DATA_HOME (NOT ~/.local/share); apps run as your user (chown to user if copying via sudo bash). Use action='handoff' (no host takeover needed) if user login/2FA is needed."
+                }).to_string()))
             }
             "wait" => {
                 let ms = action.delta.unwrap_or(500).clamp(1, 30_000) as u64;

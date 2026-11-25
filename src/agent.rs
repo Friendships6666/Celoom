@@ -1662,7 +1662,7 @@ impl Engine {
                                         }
                                     }
                                     Ok(Call::Dag(args)) => {
-                                        engine
+                                        match engine
                                             .execute_dag(
                                                 &session_clone,
                                                 &snapshot_clone,
@@ -1670,9 +1670,16 @@ impl Engine {
                                                 cancel_clone,
                                             )
                                             .await
+                                        {
+                                            Ok((text, context)) => {
+                                                additional_context = context;
+                                                Ok(text)
+                                            }
+                                            Err(error) => Err(error),
+                                        }
                                     }
                                     Ok(call) => {
-                                        engine
+                                        match engine
                                             .execute_leaf_call(
                                                 &session_clone,
                                                 &snapshot_clone,
@@ -1680,6 +1687,13 @@ impl Engine {
                                                 cancel_clone,
                                             )
                                             .await
+                                        {
+                                            Ok((text, context)) => {
+                                                additional_context = context;
+                                                Ok(text)
+                                            }
+                                            Err(error) => Err(error),
+                                        }
                                     }
                                 }
                             };
@@ -1847,17 +1861,33 @@ impl Engine {
                             }
                         }
                         Ok(Call::Dag(args)) => {
-                            self.execute_dag(session, &request_snapshot, args, cancel.clone())
+                            match self
+                                .execute_dag(session, &request_snapshot, args, cancel.clone())
                                 .await
+                            {
+                                Ok((text, context)) => {
+                                    additional_context = context;
+                                    Ok(text)
+                                }
+                                Err(error) => Err(error),
+                            }
                         }
                         Ok(call) => {
-                            self.execute_leaf_call(
-                                session,
-                                &request_snapshot,
-                                call,
-                                cancel.clone(),
-                            )
-                            .await
+                            match self
+                                .execute_leaf_call(
+                                    session,
+                                    &request_snapshot,
+                                    call,
+                                    cancel.clone(),
+                                )
+                                .await
+                            {
+                                Ok((text, context)) => {
+                                    additional_context = context;
+                                    Ok(text)
+                                }
+                                Err(error) => Err(error),
+                            }
                         }
                     }
                 };
@@ -1965,15 +1995,21 @@ impl Engine {
         snapshot: &Snapshot,
         call: Call,
         cancel: CancellationToken,
-    ) -> Result<String> {
+    ) -> Result<(String, Vec<Value>)> {
         match call {
             Call::WebSearch(args) => {
                 let config = self.inner.store.config().await?;
-                crate::web_tools::search(args, config.search, config.network, cancel).await
+                Ok((
+                    crate::web_tools::search(args, config.search, config.network, cancel).await?,
+                    Vec::new(),
+                ))
             }
             Call::WebFetch(args) => {
                 let config = self.inner.store.config().await?;
-                crate::web_tools::fetch(args, config.network, cancel).await
+                Ok((
+                    crate::web_tools::fetch(args, config.network, cancel).await?,
+                    Vec::new(),
+                ))
             }
             Call::Computer(args) => {
                 if (args.action == "screenshot"
@@ -1992,14 +2028,15 @@ impl Engine {
                 if !context.is_empty() && !snapshot.supports_images {
                     bail!("This observation includes pixels; select an image-capable model");
                 }
-                Ok(text)
+                Ok((text, context))
             }
-            other => {
+            other => Ok((
                 self.inner
                     .tools
                     .execute(&session.id, Path::new(&session.cwd), other, cancel)
-                    .await
-            }
+                    .await?,
+                Vec::new(),
+            )),
         }
     }
 
@@ -2009,7 +2046,7 @@ impl Engine {
         snapshot: &Snapshot,
         dag: crate::tools::DagArgs,
         cancel: CancellationToken,
-    ) -> Result<String> {
+    ) -> Result<(String, Vec<Value>)> {
         use std::sync::atomic::Ordering;
         let started_at = Instant::now();
         let fail_fast = dag.fail_fast.unwrap_or(false);
@@ -2017,6 +2054,7 @@ impl Engine {
         let mut status: Vec<&'static str> = vec!["pending"; n];
         let mut outputs: Vec<String> = vec![String::new(); n];
         let mut durations: Vec<u128> = vec![0; n];
+        let mut extra_context: Vec<Value> = Vec::new();
         let id_to_idx: HashMap<&str, usize> = dag
             .nodes
             .iter()
@@ -2136,9 +2174,10 @@ impl Engine {
             for (idx, elapsed_ms, res) in wave_results {
                 durations[idx] = elapsed_ms;
                 match res {
-                    Ok(out) => {
+                    Ok((out, ctx)) => {
                         status[idx] = "succeeded";
                         outputs[idx] = out;
+                        extra_context.extend(ctx);
                     }
                     Err(err) => {
                         status[idx] = "failed";
@@ -2183,14 +2222,17 @@ impl Engine {
             })
             .collect();
 
-        Ok(serde_json::to_string(&json!({
-            "total": n,
-            "succeeded": succeeded,
-            "failed": failed,
-            "skipped": skipped,
-            "duration_ms": started_at.elapsed().as_millis(),
-            "nodes": node_reports,
-        }))?)
+        Ok((
+            serde_json::to_string(&json!({
+                "total": n,
+                "succeeded": succeeded,
+                "failed": failed,
+                "skipped": skipped,
+                "duration_ms": started_at.elapsed().as_millis(),
+                "nodes": node_reports,
+            }))?,
+            extra_context,
+        ))
     }
 
     fn interpolate_dag_value(value: &mut Value, replacements: &[(String, String)]) {

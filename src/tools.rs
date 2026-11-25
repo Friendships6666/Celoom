@@ -152,11 +152,31 @@ where
             )));
         }
     };
-    serde_json::from_value(arr).map_err(serde::de::Error::custom)
+    let mut nodes: Vec<DagNode> = serde_json::from_value(arr).map_err(serde::de::Error::custom)?;
+    let mut used: std::collections::HashSet<String> = nodes
+        .iter()
+        .filter(|n| !n.id.trim().is_empty())
+        .map(|n| n.id.clone())
+        .collect();
+    let mut seq = 1usize;
+    for node in &mut nodes {
+        if node.id.trim().is_empty() {
+            loop {
+                let candidate = format!("n{seq}");
+                seq += 1;
+                if used.insert(candidate.clone()) {
+                    node.id = candidate;
+                    break;
+                }
+            }
+        }
+    }
+    Ok(nodes)
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DagNode {
+    #[serde(default)]
     pub id: String,
     pub tool: String,
     #[serde(default)]
@@ -266,7 +286,7 @@ pub fn validate(name: &str, args: &Value) -> Result<Call> {
     // typed execution deserialization interprets omitted optional fields as None.
     static DEFINITIONS: std::sync::OnceLock<Vec<Value>> = std::sync::OnceLock::new();
     let definition = DEFINITIONS
-        .get_or_init(schemas)
+        .get_or_init(all_schemas)
         .iter()
         .find(|tool| tool["name"] == name)
         .with_context(|| format!("Unknown tool: {name}"))?;
@@ -712,6 +732,18 @@ fn matcher(pattern: &str) -> Result<GlobMatcher> {
 }
 
 pub fn schemas() -> Vec<Value> {
+    all_schemas()
+        .into_iter()
+        .filter(|tool| {
+            matches!(
+                tool["name"].as_str(),
+                Some("dag" | "subagent" | "goal" | "ask_user" | "read_image")
+            )
+        })
+        .collect()
+}
+
+fn all_schemas() -> Vec<Value> {
     fn optional(t: &str) -> Value {
         json!({"type":[t,"null"]})
     }
@@ -792,21 +824,21 @@ pub fn schemas() -> Vec<Value> {
         ),
         function(
             "dag",
-            "Execute a Directed Acyclic Graph (DAG) of tool calls in parallel waves with conditional branching on upstream success/failure to minimize model roundtrips. Independent nodes run concurrently; downstream nodes run once all deps finish and satisfy 'on' ('success' default | 'failure' | 'always'). String values in args may reference {{node_id.output}} or {{node_id.status}}. Allowed inner tools: read, write, edit, glob, grep, bash, job, web_search, web_fetch, computer. Pass args as a plain JSON object (NO stringifying or double-escaping needed), e.g. {\"url\":\"https://...\",\"max_chars\":8000}. Omit deps/on for root nodes.",
+            "Execute 1..32 tool calls as a parallel wave or branching DAG in ONE roundtrip. Pure-parallel minimal syntax (omit id/args/deps/on): {\"nodes\":[{\"tool\":\"web_fetch\",\"url\":\"https://...\"},{\"tool\":\"bash\",\"command\":\"cargo test\"}]}. With dependencies/branching: add id, deps:[\"id1\"], on:\"success\"|\"failure\"|\"always\", and optional {{id1.output}}/{{id1.status}} templates. Parameters can be flat on the node OR inside args:{...} (plain JSON object, NEVER stringify/escape). Inner tools & exact fields:\n- read(path, offset?, limit?)\n- write(path, content, expected_revision?)\n- edit(path, old_string, new_string, replace_all?)\n- glob(pattern, path?, max_results?)\n- grep(pattern, path?, glob?, max_results?, case_sensitive?)\n- bash(command, cwd?, timeout_ms?, background?)\n- job(action:'poll'|'cancel', job_id, wait_ms?)\n- web_search(query, max_results?, depth?:'standard'|'deep', engine?)\n- web_fetch(url, max_chars?)\n- computer(action:'status'|'open'|'observe'|'click'|'fill'|'type'|'key'|'scroll'|'hover'|'back'|'wait'|'eval'|'cookies'|'handoff'|'resume_headless'|'screenshot'|'launch'|'stop', target?, ref_id?, url?, text?, x?, y?, key?, button?, delta?, argv?)",
             json!({
                 "nodes": {
                     "type": "array",
                     "items": {
                         "type": "object",
                         "properties": {
-                            "id": {"type": "string"},
+                            "id": {"type": ["string", "null"]},
                             "tool": {"type": "string", "enum": ["read", "write", "edit", "glob", "grep", "bash", "job", "web_search", "web_fetch", "computer"]},
-                            "args": {"type": "object", "additionalProperties": true},
+                            "args": {"type": ["object", "null"], "additionalProperties": true},
                             "deps": {"type": ["array", "null"], "items": {"type": "string"}},
                             "on": {"type": ["string", "null"], "enum": ["success", "failure", "always", null]}
                         },
-                        "required": ["id", "tool", "args"],
-                        "additionalProperties": false
+                        "required": ["tool"],
+                        "additionalProperties": true
                     }
                 },
                 "fail_fast": optional("boolean")
@@ -1549,8 +1581,9 @@ mod tests {
     }
     #[test]
     fn all_schema_properties_are_required() {
-        assert_eq!(schemas().len(), 15);
-        for schema in schemas() {
+        assert_eq!(schemas().len(), 5);
+        assert_eq!(all_schemas().len(), 15);
+        for schema in all_schemas() {
             let p = &schema["parameters"];
             assert_eq!(
                 p["properties"].as_object().unwrap().len(),
@@ -1704,5 +1737,19 @@ mod tests {
             "nodes": "[{\"id\":\"s1\",\"tool\":\"web_search\",\"args\":{\"query\":\"rust\"}}]"
         });
         assert!(validate("dag", &stringified_nodes).is_ok());
+
+        let minimal_pure_parallel = json!({
+            "nodes": [
+                {"tool": "web_fetch", "url": "https://a.example"},
+                {"tool": "bash", "command": "echo ok"}
+            ]
+        });
+        match validate("dag", &minimal_pure_parallel).unwrap() {
+            Call::Dag(d) => {
+                assert_eq!(d.nodes[0].id, "n1");
+                assert_eq!(d.nodes[1].id, "n2");
+            }
+            _ => panic!("expected Call::Dag"),
+        }
     }
 }

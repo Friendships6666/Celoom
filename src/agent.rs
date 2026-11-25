@@ -2682,7 +2682,7 @@ impl Engine {
             .max(1);
         let available = snapshot
             .context_window
-            .saturating_sub(snapshot.max_output_tokens + network::INSTRUCTIONS.len() as u64 + 4096)
+            .saturating_sub(snapshot.max_output_tokens + network::instructions().len() as u64 + 4096)
             as usize;
         if available < 4096 {
             bail!("CONTEXT_LIMIT: Model window is too small for safe automatic summarization");
@@ -2959,7 +2959,7 @@ fn within_budget(items: &[Value], snapshot: &Snapshot, compact: bool) -> Result<
         (serde_json::to_vec(&tools::schemas())?.len() as u64).div_ceil(4)
     };
     let estimated = cost(&Value::Array(items.to_vec()))
-        .saturating_add(approx_str_tokens(network::INSTRUCTIONS))
+        .saturating_add(approx_str_tokens(network::instructions()))
         .saturating_add(tools)
         .saturating_add(512);
     if compact {

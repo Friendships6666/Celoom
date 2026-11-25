@@ -12,7 +12,7 @@ import time
 def private_environment():
     runtime = os.environ.get("XDG_RUNTIME_DIR", "")
     address = os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")
-    if not runtime or not os.path.basename(runtime).startswith("justai-desktop-"):
+    if not runtime or not os.path.basename(runtime).startswith(("celoom-desktop-", "justai-desktop-")):
         raise RuntimeError("private desktop runtime required")
     st = os.stat(runtime)
     if st.st_uid != os.getuid() or st.st_mode & 0o077:

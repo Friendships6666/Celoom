@@ -754,7 +754,7 @@ fn all_schemas() -> Vec<Value> {
     vec![
         function(
             "computer",
-            "Control UI with highest available privileges. Prefer browser DOM refs (persistent AI browser with saved login/cookies), then desktop accessibility refs (isolated KDE Wayland), only target=host for shared-desktop fallback. Browser also supports back, wait (ms in delta or selector in text), hover, eval (JS expression in text), cookies, handoff (pop up visible browser for user CAPTCHA/login; pair with ask_user blocking=true), resume_headless (close popup & resume). Observe before actions; refs expire.",
+            "Control UI with highest available privileges. Targets: 'browser' (default, call open(url) first), 'desktop' (isolated private KDE Wayland, call launch(argv) first), 'host' (user's live desktop if enabled in settings; check status first). Actions: status, open, observe, click, fill, type, key, scroll, hover, back, wait, eval, cookies, handoff, resume_headless, screenshot, launch, stop. Always observe before acting; refs expire.",
             json!({"action":{"type":"string","enum":["status","open","observe","click","fill","type","key","scroll","hover","back","wait","eval","cookies","handoff","resume_headless","screenshot","launch","stop"]},"target":optional("string"),"ref_id":optional("string"),"url":optional("string"),"text":optional("string"),"x":optional("integer"),"y":optional("integer"),"key":optional("string"),"button":optional("string"),"delta":optional("integer"),"argv":{"type":["array","null"],"items":{"type":"string"}}}),
         ),
         function(

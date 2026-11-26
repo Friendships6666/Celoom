@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import {
+  computeWorkloadDynamics,
   renderDiscreteCellPattern,
   selectDynamicPresets,
   type AnimationStyleId,
@@ -29,6 +30,8 @@ function hexByte(s: string, offset: number): number {
   const ln = lo >= 48 && lo <= 57 ? lo - 48 : lo >= 97 && lo <= 102 ? lo - 87 : lo >= 65 && lo <= 70 ? lo - 55 : 0;
   return (hn << 4) | ln;
 }
+
+const PRESET_LOCK_MS = 60_000;
 
 export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark'; authenticated: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -81,6 +84,15 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     let rafId = 0;
     let lastDraw = 0;
+    let prevNow = performance.now();
+
+    // Monotonic integrated time & smoothed dynamics prevent backward jumps / flickering.
+    let animTime = 0;
+    let smoothSpeed = 1.9;
+    let smoothIntensity = 0;
+    let lockedStyles: AnimationStyleId[] = [];
+    let lockedUntil = 0;
+    let lastNonIdleMode: AutomatonMode = 'thinking';
 
     const resize = () => {
       const aspect = window.innerHeight > 0 ? window.innerWidth / window.innerHeight : 16 / 9;
@@ -106,30 +118,45 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
         toolKinds: frame?.tool_kinds ?? 0,
         energy: frame?.energy ?? 0,
       };
-      const minInterval = workload.mode === 'idle' ? 120 : 28;
+      const minInterval = workload.mode === 'idle' && smoothIntensity <= 0.02 ? 120 : 28;
       if (!reducedMotion && now - lastDraw < minInterval) {
         rafId = window.requestAnimationFrame(draw);
         return;
       }
+      const dt = Math.min(0.1, Math.max(0.001, (now - prevNow) * 0.001));
+      prevNow = now;
       lastDraw = now;
+
+      const targetDyn = computeWorkloadDynamics(workload);
+      smoothSpeed += (targetDyn.speed - smoothSpeed) * 0.05;
+      smoothIntensity += (targetDyn.intensity - smoothIntensity) * (workload.mode === 'idle' ? 0.08 : 0.12);
+      animTime += dt * smoothSpeed;
+
+      if (workload.mode !== 'idle') {
+        lastNonIdleMode = workload.mode;
+        if (lockedStyles.length === 0 || now >= lockedUntil) {
+          lockedStyles = selectDynamicPresets(workload, now * 0.001);
+          lockedUntil = now + PRESET_LOCK_MS;
+        }
+      }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Background is completely blank when idle (not working/thinking).
-      if (workload.mode !== 'idle') {
-        const tSec = now * 0.001;
-        const styles = selectDynamicPresets(workload, tSec);
+      if (smoothIntensity > 0.02 && lockedStyles.length > 0) {
+        const renderWorkload: LiveWorkload =
+          workload.mode === 'idle' ? { ...workload, mode: lastNonIdleMode } : workload;
         renderDiscreteCellPattern(
           ctx,
           canvas.width,
           canvas.height,
-          tSec,
-          styles,
-          workload,
+          animTime,
+          lockedStyles,
+          renderWorkload,
           themeRef.current,
           decodedRef.current,
           frame?.cols,
           frame?.rows,
+          smoothIntensity,
         );
       }
 
@@ -140,6 +167,7 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
 
     const onVisibility = () => {
       if (!document.hidden && !reducedMotion && !rafId) {
+        prevNow = performance.now();
         rafId = window.requestAnimationFrame(draw);
       }
     };
@@ -174,28 +202,41 @@ export function AutomatonPreview({
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
     let rafId = 0;
+    let prevNow = performance.now();
+    let animTime = 0;
+    let smoothSpeed = 1.9;
+    let smoothIntensity = 1.2;
+
     const draw = (now: number) => {
       const { style: sel, workload: wl, theme: th } = propsRef.current;
-      const tSec = now * 0.001;
-      const activeStyles = sel === 'auto' ? selectDynamicPresets(wl, tSec) : [sel];
+      const dt = Math.min(0.1, Math.max(0.001, (now - prevNow) * 0.001));
+      prevNow = now;
+      const dyn = computeWorkloadDynamics(wl);
+      smoothSpeed += (dyn.speed - smoothSpeed) * 0.08;
+      smoothIntensity += (dyn.intensity - smoothIntensity) * 0.1;
+      animTime += dt * smoothSpeed;
+
+      const activeStyles = sel === 'auto' ? selectDynamicPresets(wl, now * 0.001) : [sel];
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (activeStyles.includes('cellular') && wl.mode !== 'idle') {
-        const cols = 28;
-        const rows = 14;
-        const fake = new Uint8Array(cols * rows * 3);
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            const v = Math.max(0, Math.sin(c * 0.55 + tSec * 2.8) * Math.cos(r * 0.6 - tSec * 2.2));
-            const i = (r * cols + c) * 3;
-            fake[i] = Math.round(50 * v);
-            fake[i + 1] = Math.round(220 * v);
-            fake[i + 2] = Math.round(255 * v);
+      if (wl.mode !== 'idle' && smoothIntensity > 0.02) {
+        if (activeStyles.includes('cellular')) {
+          const cols = 28;
+          const rows = 14;
+          const fake = new Uint8Array(cols * rows * 3);
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const v = Math.max(0, Math.sin(c * 0.55 + animTime * 1.4) * Math.cos(r * 0.6 - animTime * 1.1));
+              const i = (r * cols + c) * 3;
+              fake[i] = Math.round(50 * v);
+              fake[i + 1] = Math.round(220 * v);
+              fake[i + 2] = Math.round(255 * v);
+            }
           }
+          renderDiscreteCellPattern(ctx, canvas.width, canvas.height, animTime, activeStyles, wl, th, fake, cols, rows, smoothIntensity);
+        } else {
+          renderDiscreteCellPattern(ctx, canvas.width, canvas.height, animTime, activeStyles, wl, th, undefined, undefined, undefined, smoothIntensity);
         }
-        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, tSec, activeStyles, wl, th, fake, cols, rows);
-      } else {
-        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, tSec, activeStyles, wl, th);
       }
       rafId = window.requestAnimationFrame(draw);
     };

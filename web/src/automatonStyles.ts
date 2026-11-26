@@ -99,7 +99,7 @@ function slotHash(slot: number): number {
  */
 export function selectDynamicPresets(workload: LiveWorkload, timeSec: number): AnimationStyleId[] {
   if (workload.mode === 'idle') return ['kaleidoscope'];
-  const slot = Math.floor(timeSec / 8);
+  const slot = Math.floor(timeSec / 60);
   const hasParallelWork =
     workload.activeSubagents > 0 ||
     workload.activeTools > 0 ||
@@ -120,7 +120,8 @@ export function selectDynamicPresets(workload: LiveWorkload, timeSec: number): A
   }
 
   const roll = h % 100;
-  const count = roll < 30 ? 3 : roll < 80 ? 2 : 1;
+  // Blending is a rare 10% event (7% 2-way, 3% 3-way); 90% single clean preset.
+  const count = roll < 3 ? 3 : roll < 10 ? 2 : 1;
   if (count === 1) return [primary];
 
   const allPool: AnimationStyleId[] = [...SWARM_CYCLE, ...TOOLING_CYCLE, ...THINKING_CYCLE];
@@ -168,20 +169,23 @@ export function renderDiscreteCellPattern(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  tSec: number,
+  integratedTime: number,
   styles: AnimationStyleId[],
   workload: LiveWorkload,
   theme: 'light' | 'dark',
   backendRgb?: Uint8Array,
   backendCols?: number,
   backendRows?: number,
+  overrideIntensity?: number,
 ): void {
-  if (workload.mode === 'idle' || styles.length === 0) {
+  if (styles.length === 0) {
     return;
   }
 
-  const { speed, intensity } = computeWorkloadDynamics(workload);
-  const t = tSec * speed;
+  const dyn = computeWorkloadDynamics(workload);
+  const intensity = overrideIntensity ?? dyn.intensity;
+  if (intensity <= 0.01) return;
+  const t = integratedTime;
   const alphaMax = (theme === 'dark' ? 0.66 : 0.4) * intensity;
 
   // Fixed grid density (pitch=14px, block=11px) to prevent lag regardless of blend count or workload.

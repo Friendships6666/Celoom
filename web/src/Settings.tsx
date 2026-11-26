@@ -1,8 +1,8 @@
 import { QualityChecks } from './QualityChecks';
 import { useEffect, useState, type FormEvent } from 'react';
-import { ChevronRight, GitBranch, Globe2, KeyRound, LockKeyhole, Network, Plus, RotateCcw, Save, Search, ShieldCheck, Sparkles, Trash2, Zap } from 'lucide-react';
+import { ChevronRight, GitBranch, Globe2, KeyRound, LockKeyhole, Network, Plus, Save, Search, ShieldCheck, Sparkles, Trash2, Zap } from 'lucide-react';
 import { AutomatonPreview } from './AutomatonBg';
-import { ANIMATION_STYLES, DEFAULT_ANIM_SETTINGS, loadAnimSettings, saveAnimSettings, type AnimationSettings } from './automatonStyles';
+import { ANIMATION_STYLES, computeWorkloadDynamics, type AnimationStyleId, type LiveWorkload } from './automatonStyles';
 import { api, ApiError, errorMessage, sanitizeConfig } from './api';
 import { Alert, Field, Modal, ModelSelect, Spinner, Toggle } from './ui';
 import { defaultSearchConfig, modelOptions, sameSelection, type ApiKey, type AppConfig, type Diagnostic, type ModelConfig, type NetworkConfig, type SearchConfig, type Selection, type Site, type SubagentModel } from './types';
@@ -229,55 +229,58 @@ function SecuritySettings({ onLoggedOut }: { onLoggedOut: () => void }) {
   return <div className="security-settings"><div className="security-emblem"><LockKeyhole size={28} /></div><h3>保护你的工作台</h3><p className="muted">修改密码后，所有设备上的登录会话将立即失效。</p><form onSubmit={event => void submit(event)} className="password-form">{error && <Alert>{error}</Alert>}<Field label="当前密码"><input required type="password" autoComplete="current-password" value={current} onChange={e => setCurrent(e.target.value)} /></Field><Field label="新密码"><input required type="password" autoComplete="new-password" value={next} onChange={e => setNext(e.target.value)} /></Field><Field label="再次输入新密码"><input required type="password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></Field><button className="button primary" disabled={busy}>{busy ? <Spinner label="更新中" /> : <><ShieldCheck size={16} />更新密码并退出</>}</button></form><p className="security-note"><ShieldCheck size={15} />密码与 API Key 从不写入浏览器本地存储。</p></div>;
 }
 
+const PREVIEW_STATES: ReadonlyArray<{
+  id: string;
+  label: string;
+  desc: string;
+  workload: LiveWorkload;
+}> = [
+  { id: 'idle', label: '空闲 (idle)', desc: '无任务运行，背景完全空白', workload: { mode: 'idle', activeSessions: 0, activeTools: 0, activeSubagents: 0, toolKinds: 0, energy: 0 } },
+  { id: 'thinking', label: '单会话思考 (thinking)', desc: '1 个主会话推理中', workload: { mode: 'thinking', activeSessions: 1, activeTools: 0, activeSubagents: 0, toolKinds: 0, energy: 0.45 } },
+  { id: 'tooling', label: '工具/DAG 执行 (tooling)', desc: '2 个工具并发调用中', workload: { mode: 'tooling', activeSessions: 1, activeTools: 2, activeSubagents: 0, toolKinds: 2, energy: 0.72 } },
+  { id: 'swarm_light', label: '多子代理并发 (3 个)', desc: '3 个子代理 + 4 个后台任务', workload: { mode: 'swarm', activeSessions: 2, activeTools: 4, activeSubagents: 3, toolKinds: 3, energy: 0.9 } },
+  { id: 'swarm_heavy', label: '极限高负载 (8 子代理)', desc: '8 个子代理 + 10 个并发工具', workload: { mode: 'swarm', activeSessions: 4, activeTools: 10, activeSubagents: 8, toolKinds: 5, energy: 1.0 } },
+];
+
 function AnimationSettingsPanel() {
-  const [anim, setAnim] = useState<AnimationSettings>(() => loadAnimSettings());
+  const [selectedStyle, setSelectedStyle] = useState<AnimationStyleId | 'auto'>('auto');
+  const [stateId, setStateId] = useState<string>('swarm_light');
   const theme: 'light' | 'dark' = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
-  function update(patch: Partial<AnimationSettings>) {
-    const next = { ...anim, ...patch };
-    setAnim(next);
-    saveAnimSettings(next);
-  }
-  return <section className="anim-settings" aria-label="背景动画设置">
+  const currentState = PREVIEW_STATES.find(s => s.id === stateId) ?? PREVIEW_STATES[3];
+  const dynamics = computeWorkloadDynamics(currentState.workload);
+
+  return <section className="anim-settings" aria-label="背景动画预览">
     <div className="section-heading">
-      <div><p className="section-eyebrow">ANIMATION / 离散细胞动画</p><h3>实时背景渲染与调试</h3><p className="muted">全部采用离散细胞方块矩阵渲染；空闲时背景完全隐藏，仅在思考/工作/并发时激活。</p></div>
-      <button type="button" className="button secondary" onClick={() => { setAnim({ ...DEFAULT_ANIM_SETTINGS }); saveAnimSettings({ ...DEFAULT_ANIM_SETTINGS }); }}><RotateCcw size={14} />恢复默认</button>
+      <div><p className="section-eyebrow">ANIMATION / 离散细胞动态预览（只读）</p><h3>全自动负载驱动细胞动画</h3><p className="muted">真实背景会随子代理数量、后台任务数自动切换预设与激烈程度（密度锁定不卡顿），任务结束自动清空；此处仅用于预览各状态与预设效果。</p></div>
     </div>
     <div className="anim-preview-box">
-      <AutomatonPreview settings={anim} theme={theme} />
-      <span className="anim-preview-badge">{ANIMATION_STYLES.find(s => s.id === anim.style)?.name} · {anim.previewMode === 'live' ? '空闲隐藏 / 工作激活' : anim.previewMode}</span>
+      <AutomatonPreview style={selectedStyle} workload={currentState.workload} theme={theme} />
+      <span className="anim-preview-badge">
+        {selectedStyle === 'auto' ? '自动轮换预设' : ANIMATION_STYLES.find(s => s.id === selectedStyle)?.name}
+        {' · '}
+        {currentState.label}
+        {currentState.workload.mode !== 'idle' ? ` · 速度 ${dynamics.speed.toFixed(2)}x · 强度 ${Math.round(dynamics.intensity * 100)}%` : ''}
+      </span>
     </div>
-    <div className="anim-style-grid" role="radiogroup" aria-label="动画样式">
+    <div className="anim-state-bar" role="radiogroup" aria-label="模拟运行状态预览">
+      {PREVIEW_STATES.map(st => (
+        <button type="button" key={st.id} className={`anim-state-pill ${stateId === st.id ? 'active' : ''}`} onClick={() => setStateId(st.id)}>
+          <strong>{st.label}</strong>
+          <small>{st.desc}</small>
+        </button>
+      ))}
+    </div>
+    <div className="anim-style-grid" role="radiogroup" aria-label="动画预设预览">
+      <button type="button" className={`anim-style-card ${selectedStyle === 'auto' ? 'active' : ''}`} onClick={() => setSelectedStyle('auto')}>
+        <div className="anim-style-head"><strong>自动动态切换</strong><span>Workload Auto</span></div>
+        <small>根据当前运行模式自动轮换匹配的高能离散细胞预设</small>
+      </button>
       {ANIMATION_STYLES.map(item => (
-        <button type="button" key={item.id} className={`anim-style-card ${anim.style === item.id ? 'active' : ''}`} onClick={() => update({ style: item.id })}>
+        <button type="button" key={item.id} className={`anim-style-card ${selectedStyle === item.id ? 'active' : ''}`} onClick={() => setSelectedStyle(item.id)}>
           <div className="anim-style-head"><strong>{item.name}</strong><span>{item.tag}</span></div>
           <small>{item.desc}</small>
         </button>
       ))}
     </div>
-    <div className="anim-controls-grid">
-      <label className="anim-slider">
-        <span>动画速度 <b>{anim.speed.toFixed(1)}x</b></span>
-        <input type="range" min="0.2" max="3.0" step="0.1" value={anim.speed} onChange={e => update({ speed: Number(e.target.value) })} />
-      </label>
-      <label className="anim-slider">
-        <span>亮度 / 强度 <b>{Math.round(anim.intensity * 100)}%</b></span>
-        <input type="range" min="0.2" max="1.8" step="0.05" value={anim.intensity} onChange={e => update({ intensity: Number(e.target.value) })} />
-      </label>
-      <label className="anim-slider">
-        <span>图形密度 <b>{anim.density.toFixed(1)}x</b></span>
-        <input type="range" min="0.5" max="2.0" step="0.1" value={anim.density} onChange={e => update({ density: Number(e.target.value) })} />
-      </label>
-      <label className="anim-slider">
-        <span>状态模拟预览</span>
-        <select value={anim.previewMode} onChange={e => update({ previewMode: e.target.value as AnimationSettings['previewMode'] })}>
-          <option value="live">跟随真实运行状态</option>
-          <option value="idle">空闲 (idle)</option>
-          <option value="thinking">思考中 (thinking)</option>
-          <option value="tooling">工具调用 (tooling)</option>
-          <option value="swarm">多 Agent 并发 (swarm)</option>
-        </select>
-      </label>
-    </div>
-    <Toggle label="叠加赛博扫描线" hint="在任意动画样式上方叠加精细扫描线与移动光束。" checked={anim.scanlines} onChange={scanlines => update({ scanlines })} />
   </section>;
 }

@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
 import {
-  ANIM_SETTINGS_EVENT,
-  loadAnimSettings,
   renderDiscreteCellPattern,
-  type AnimationSettings,
+  selectDynamicPreset,
+  type AnimationStyleId,
   type AutomatonMode,
+  type LiveWorkload,
 } from './automatonStyles';
 
 interface AutomatonFrame {
@@ -35,21 +35,7 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
   const frameRef = useRef<AutomatonFrame | null>(null);
   const decodedRef = useRef<Uint8Array>(new Uint8Array(0));
   const themeRef = useRef(theme);
-  const settingsRef = useRef<AnimationSettings>(loadAnimSettings());
   themeRef.current = theme;
-
-  useEffect(() => {
-    const sync = (ev?: Event) => {
-      const detail = (ev as CustomEvent<AnimationSettings> | undefined)?.detail;
-      settingsRef.current = detail ?? loadAnimSettings();
-    };
-    window.addEventListener(ANIM_SETTINGS_EVENT, sync);
-    window.addEventListener('storage', sync);
-    return () => {
-      window.removeEventListener(ANIM_SETTINGS_EVENT, sync);
-      window.removeEventListener('storage', sync);
-    };
-  }, []);
 
   useEffect(() => {
     if (!authenticated) {
@@ -111,10 +97,16 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
         rafId = 0;
         return;
       }
-      const settings = settingsRef.current;
       const frame = frameRef.current;
-      const mode: AutomatonMode = settings.previewMode !== 'live' ? settings.previewMode : (frame?.mode ?? 'idle');
-      const minInterval = mode === 'idle' || settings.style === 'off' ? 120 : 28;
+      const workload: LiveWorkload = {
+        mode: frame?.mode ?? 'idle',
+        activeSessions: frame?.active_sessions ?? 0,
+        activeTools: frame?.active_tools ?? 0,
+        activeSubagents: frame?.active_subagents ?? 0,
+        toolKinds: frame?.tool_kinds ?? 0,
+        energy: frame?.energy ?? 0,
+      };
+      const minInterval = workload.mode === 'idle' ? 120 : 28;
       if (!reducedMotion && now - lastDraw < minInterval) {
         rafId = window.requestAnimationFrame(draw);
         return;
@@ -123,20 +115,18 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Show nothing when idle (not working/thinking) or animation is off.
-      if (settings.style !== 'off' && mode !== 'idle') {
-        const energy = settings.previewMode !== 'live'
-          ? (mode === 'swarm' ? 1.0 : mode === 'tooling' ? 0.8 : 0.55)
-          : (frame?.energy ?? 0.45);
+      // Background is completely blank when idle (not working/thinking).
+      if (workload.mode !== 'idle') {
+        const tSec = now * 0.001;
+        const style = selectDynamicPreset(workload, tSec);
         renderDiscreteCellPattern(
           ctx,
           canvas.width,
           canvas.height,
-          now * 0.001,
-          mode,
-          energy,
+          tSec,
+          style,
+          workload,
           themeRef.current,
-          settings,
           decodedRef.current,
           frame?.cols,
           frame?.rows,
@@ -165,12 +155,18 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
   return <canvas ref={canvasRef} className="automaton-bg" aria-hidden="true" />;
 }
 
-export function AutomatonPreview({ settings, theme }: { settings: AnimationSettings; theme: 'light' | 'dark' }) {
+export function AutomatonPreview({
+  style,
+  workload,
+  theme,
+}: {
+  style: AnimationStyleId | 'auto';
+  workload: LiveWorkload;
+  theme: 'light' | 'dark';
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const settingsRef = useRef(settings);
-  const themeRef = useRef(theme);
-  settingsRef.current = settings;
-  themeRef.current = theme;
+  const propsRef = useRef({ style, workload, theme });
+  propsRef.current = { style, workload, theme };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -179,28 +175,27 @@ export function AutomatonPreview({ settings, theme }: { settings: AnimationSetti
     if (!ctx) return;
     let rafId = 0;
     const draw = (now: number) => {
-      const s = settingsRef.current;
-      // In Settings preview, if previewMode is 'live', preview with 'thinking' so the user can see the discrete cells clearly.
-      const mode: AutomatonMode = s.previewMode === 'live' ? 'thinking' : s.previewMode;
-      const energy = mode === 'swarm' ? 1.0 : mode === 'tooling' ? 0.8 : 0.55;
+      const { style: sel, workload: wl, theme: th } = propsRef.current;
+      const tSec = now * 0.001;
+      const activeStyle = sel === 'auto' ? selectDynamicPreset(wl, tSec) : sel;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (s.style === 'cellular' && mode !== 'idle') {
+      if (activeStyle === 'cellular' && wl.mode !== 'idle') {
         const cols = 28;
         const rows = 14;
         const fake = new Uint8Array(cols * rows * 3);
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
-            const v = Math.max(0, Math.sin(c * 0.5 + now * 0.0025 * s.speed) * Math.cos(r * 0.55 - now * 0.002 * s.speed));
+            const v = Math.max(0, Math.sin(c * 0.55 + tSec * 2.8) * Math.cos(r * 0.6 - tSec * 2.2));
             const i = (r * cols + c) * 3;
-            fake[i] = Math.round(40 * v);
-            fake[i + 1] = Math.round(210 * v);
+            fake[i] = Math.round(50 * v);
+            fake[i + 1] = Math.round(220 * v);
             fake[i + 2] = Math.round(255 * v);
           }
         }
-        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, now * 0.001, mode, energy, themeRef.current, s, fake, cols, rows);
+        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, tSec, activeStyle, wl, th, fake, cols, rows);
       } else {
-        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, now * 0.001, mode, energy, themeRef.current, s);
+        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, tSec, activeStyle, wl, th);
       }
       rafId = window.requestAnimationFrame(draw);
     };

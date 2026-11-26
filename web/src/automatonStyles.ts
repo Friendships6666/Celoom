@@ -7,29 +7,21 @@ export type AnimationStyleId =
   | 'scanline'
   | 'wave'
   | 'vortex'
-  | 'cellular'
-  | 'off';
+  | 'dna_helix'
+  | 'matrix_rain'
+  | 'plasma_lattice'
+  | 'shockwave'
+  | 'fractal_diamond'
+  | 'cellular';
 
-export interface AnimationSettings {
-  style: AnimationStyleId;
-  speed: number;
-  intensity: number;
-  density: number;
-  scanlines: boolean;
-  previewMode: 'live' | AutomatonMode;
+export interface LiveWorkload {
+  mode: AutomatonMode;
+  activeSessions: number;
+  activeTools: number;
+  activeSubagents: number;
+  toolKinds: number;
+  energy: number;
 }
-
-export const DEFAULT_ANIM_SETTINGS: AnimationSettings = {
-  style: 'kaleidoscope',
-  speed: 1.0,
-  intensity: 1.0,
-  density: 1.0,
-  scanlines: true,
-  previewMode: 'live',
-};
-
-const STORAGE_KEY = 'celoom-anim-settings';
-export const ANIM_SETTINGS_EVENT = 'celoom:anim-settings';
 
 export const ANIMATION_STYLES: ReadonlyArray<{
   id: AnimationStyleId;
@@ -37,57 +29,64 @@ export const ANIMATION_STYLES: ReadonlyArray<{
   tag: string;
   desc: string;
 }> = [
-  { id: 'kaleidoscope', name: '万花筒对称细胞', tag: '12-Fold Cells', desc: '12 阶镜像对称玫瑰线激活的离散细胞方块矩阵' },
-  { id: 'spiral', name: '螺旋线细胞阵', tag: 'Spiral Cells', desc: '多臂阿基米德螺旋与黄金螺线点亮的离散细胞块' },
-  { id: 'lissajous', name: '李萨如细胞轨迹', tag: 'Lissajous Grid', desc: '谐波参数轨迹投射到离散网格的余辉细胞块' },
-  { id: 'scanline', name: '扫描线细胞矩阵', tag: 'Scanline Cells', desc: '横纵扫描线与旋转雷达扫过的离散脉冲细胞块' },
-  { id: 'wave', name: '波纹干涉细胞', tag: 'Wave Cells', desc: '双波源相干驻波等值区点亮的离散细胞方块' },
-  { id: 'vortex', name: '旋涡细胞流', tag: 'Vortex Cells', desc: '极坐标涡旋角动量场驱动的离散细胞簇' },
-  { id: 'cellular', name: '经典细胞矩阵', tag: '256-Color CA', desc: '后端实时 256 色离散元胞方块阵（无平滑模糊）' },
-  { id: 'off', name: '关闭动画', tag: 'Minimal', desc: '始终保持纯净静态背景' },
+  { id: 'kaleidoscope', name: '万花筒对称细胞', tag: '12-Fold Cells', desc: '12 阶镜像对称玫瑰线高能细胞矩阵' },
+  { id: 'spiral', name: '双生螺旋星云', tag: 'Spiral Cells', desc: '多臂阿基米德螺旋与黄金螺线细胞阵' },
+  { id: 'dna_helix', name: '双螺旋基因链', tag: '3D Helix Grid', desc: '三维投影双螺旋碱基对离散细胞块' },
+  { id: 'matrix_rain', name: '赛博数字瀑布', tag: 'Matrix Cells', desc: '高速下落余辉脉冲细胞柱列' },
+  { id: 'plasma_lattice', name: '量子等离子晶格', tag: 'Plasma Lattice', desc: '多频正弦叠加高饱和等离子细胞阵' },
+  { id: 'shockwave', name: '超新星冲击波', tag: 'Shockwave', desc: '同心爆发冲击波环与径向高能射线' },
+  { id: 'fractal_diamond', name: '分形菱形曼陀罗', tag: 'XOR Fractal', desc: '曼哈顿与切比雪夫分形对称细胞图腾' },
+  { id: 'lissajous', name: '李萨如细胞轨迹', tag: 'Lissajous Grid', desc: '多频谐波李萨如余辉细胞轨迹' },
+  { id: 'scanline', name: '扫描线细胞矩阵', tag: 'Radar + Scan', desc: '横纵强扫描光束与旋转雷达细胞阵' },
+  { id: 'wave', name: '波纹干涉细胞', tag: 'Wave Field', desc: '多波源相干驻波等值离散细胞块' },
+  { id: 'vortex', name: '旋涡细胞流', tag: 'Vortex Cells', desc: '极坐标强涡旋角动量离散细胞簇' },
+  { id: 'cellular', name: '经典元胞矩阵', tag: '256-Color CA', desc: '后端实时 256 色离散元胞方块阵' },
 ];
 
-export function loadAnimSettings(): AnimationSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_ANIM_SETTINGS };
-    const parsed = JSON.parse(raw) as Partial<AnimationSettings>;
-    const validStyle = ANIMATION_STYLES.some(s => s.id === parsed.style)
-      ? (parsed.style as AnimationStyleId)
-      : DEFAULT_ANIM_SETTINGS.style;
-    const clamp = (v: unknown, min: number, max: number, fallback: number) =>
-      typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
-    const validPreview = ['live', 'idle', 'thinking', 'tooling', 'swarm'].includes(String(parsed.previewMode))
-      ? (parsed.previewMode as AnimationSettings['previewMode'])
-      : 'live';
-    return {
-      style: validStyle,
-      speed: clamp(parsed.speed, 0.2, 3.0, DEFAULT_ANIM_SETTINGS.speed),
-      intensity: clamp(parsed.intensity, 0.2, 1.8, DEFAULT_ANIM_SETTINGS.intensity),
-      density: clamp(parsed.density, 0.5, 2.0, DEFAULT_ANIM_SETTINGS.density),
-      scanlines: typeof parsed.scanlines === 'boolean' ? parsed.scanlines : DEFAULT_ANIM_SETTINGS.scanlines,
-      previewMode: validPreview,
-    };
-  } catch {
-    return { ...DEFAULT_ANIM_SETTINGS };
-  }
+const THINKING_CYCLE: AnimationStyleId[] = ['spiral', 'dna_helix', 'lissajous', 'kaleidoscope'];
+const TOOLING_CYCLE: AnimationStyleId[] = ['scanline', 'matrix_rain', 'wave', 'plasma_lattice'];
+const SWARM_CYCLE: AnimationStyleId[] = ['shockwave', 'vortex', 'fractal_diamond', 'kaleidoscope', 'plasma_lattice'];
+
+/** Dynamically chooses a preset from live mode & time (switching ~every 8s). */
+export function selectDynamicPreset(workload: LiveWorkload, timeSec: number): AnimationStyleId {
+  if (workload.mode === 'idle') return 'kaleidoscope';
+  const pool =
+    workload.mode === 'swarm' || workload.activeSubagents > 0
+      ? SWARM_CYCLE
+      : workload.mode === 'tooling' || workload.activeTools > 0
+        ? TOOLING_CYCLE
+        : THINKING_CYCLE;
+  const idx = Math.floor(timeSec / 8) % pool.length;
+  return pool[idx];
 }
 
-export function saveAnimSettings(next: AnimationSettings): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    /* Storage may be disabled. */
+/** Computes workload-driven intensity & speed while keeping cell grid density fixed. */
+export function computeWorkloadDynamics(workload: LiveWorkload): { speed: number; intensity: number } {
+  if (workload.mode === 'idle') {
+    return { speed: 1.0, intensity: 0.0 };
   }
-  window.dispatchEvent(new CustomEvent(ANIM_SETTINGS_EVENT, { detail: next }));
+  const load =
+    workload.activeSubagents * 0.55 +
+    workload.activeTools * 0.32 +
+    workload.activeSessions * 0.18 +
+    workload.toolKinds * 0.14 +
+    workload.energy * 0.45;
+  const modeBaseSpeed =
+    workload.mode === 'swarm' ? 1.85 : workload.mode === 'tooling' ? 1.55 : 1.3;
+  const modeBaseIntensity =
+    workload.mode === 'swarm' ? 1.55 : workload.mode === 'tooling' ? 1.38 : 1.22;
+  return {
+    speed: Math.min(3.4, modeBaseSpeed + load * 0.42),
+    intensity: Math.min(1.85, modeBaseIntensity + load * 0.25),
+  };
 }
 
 function cellColor(theme: 'light' | 'dark', mode: AutomatonMode, phase: number, alpha: number): string {
   const hueBase =
-    mode === 'swarm' ? 295 : mode === 'tooling' ? 162 : mode === 'thinking' ? 202 : theme === 'dark' ? 192 : 345;
-  const hue = ((hueBase + phase * 85) % 360 + 360) % 360;
-  const sat = theme === 'dark' ? 90 : 74;
-  const light = theme === 'dark' ? 60 : 45;
+    mode === 'swarm' ? 295 : mode === 'tooling' ? 160 : mode === 'thinking' ? 200 : 192;
+  const hue = ((hueBase + phase * 95) % 360 + 360) % 360;
+  const sat = theme === 'dark' ? 94 : 78;
+  const light = theme === 'dark' ? 62 : 46;
   return `hsla(${hue.toFixed(0)}, ${sat}%, ${light}%, ${Math.max(0, Math.min(1, alpha)).toFixed(3)})`;
 }
 
@@ -96,39 +95,37 @@ export function renderDiscreteCellPattern(
   w: number,
   h: number,
   tSec: number,
-  mode: AutomatonMode,
-  energy: number,
+  style: AnimationStyleId,
+  workload: LiveWorkload,
   theme: 'light' | 'dark',
-  settings: AnimationSettings,
   backendRgb?: Uint8Array,
   backendCols?: number,
   backendRows?: number,
 ): void {
-  if (settings.style === 'off' || mode === 'idle') {
+  if (workload.mode === 'idle') {
     return;
   }
 
-  const modeBoost = mode === 'swarm' ? 1.5 : mode === 'tooling' ? 1.3 : 1.1;
-  const t = tSec * settings.speed * modeBoost;
-  const alphaMax = (theme === 'dark' ? 0.58 : 0.34) * settings.intensity * (0.85 + Math.min(0.5, energy * 0.4));
+  const { speed, intensity } = computeWorkloadDynamics(workload);
+  const t = tSec * speed;
+  const alphaMax = (theme === 'dark' ? 0.64 : 0.38) * intensity;
 
-  // Crisp discrete cell pitch & block size with visible gap between blocks.
-  const pitch = Math.max(8, Math.round(16 / settings.density));
-  const gap = pitch >= 12 ? 3 : 2;
-  const block = Math.max(4, pitch - gap);
+  // Fixed grid density (pitch=14px, block=11px) to prevent lag regardless of workload.
+  const pitch = 14;
+  const block = 11;
   const cols = Math.ceil(w / pitch);
   const rows = Math.ceil(h / pitch);
   const cx = w * 0.5;
   const cy = h * 0.5;
   const maxR = Math.hypot(cx, cy);
 
-  if (settings.style === 'cellular') {
+  if (style === 'cellular') {
     if (backendRgb && backendCols && backendRows && backendRgb.length === backendCols * backendRows * 3) {
       const cellW = w / backendCols;
       const cellH = h / backendRows;
       const gx = Math.max(1, Math.round(cellW * 0.14));
       const gy = Math.max(1, Math.round(cellH * 0.14));
-      const scanY = settings.scanlines ? ((t * 90) % h) : -999;
+      const scanY = (t * 115) % h;
       for (let r = 0; r < backendRows; r++) {
         for (let c = 0; c < backendCols; c++) {
           const idx = (r * backendCols + c) * 3;
@@ -139,11 +136,9 @@ export function renderDiscreteCellPattern(
           if (peak <= 8) continue;
           const px = Math.round(c * cellW);
           const py = Math.round(r * cellH);
-          let a = (0.08 + Math.pow(peak / 255, 0.85) * alphaMax);
-          if (settings.scanlines) {
-            const dist = Math.abs(py - scanY);
-            if (dist < 48) a = Math.min(0.95, a * (1 + (1 - dist / 48) * 0.9));
-          }
+          let a = 0.1 + Math.pow(peak / 255, 0.8) * alphaMax;
+          const dist = Math.abs(py - scanY);
+          if (dist < 52) a = Math.min(0.96, a * (1 + (1 - dist / 52) * 0.95));
           ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${Math.min(1, a).toFixed(3)})`;
           ctx.fillRect(px, py, Math.max(2, Math.floor(cellW) - gx), Math.max(2, Math.floor(cellH) - gy));
         }
@@ -152,39 +147,38 @@ export function renderDiscreteCellPattern(
     return;
   }
 
-  // Precompute Lissajous discrete cell map if needed.
   let lissajousGrid: Float32Array | null = null;
   let lissajousPhase: Float32Array | null = null;
-  if (settings.style === 'lissajous') {
+  if (style === 'lissajous') {
     lissajousGrid = new Float32Array(cols * rows);
     lissajousPhase = new Float32Array(cols * rows);
-    const curves = 2;
-    const samples = 220;
+    const curves = 3;
+    const samples = 240;
     for (let curve = 0; curve < curves; curve++) {
       const fx = 3 + curve;
-      const fy = 2 + curve;
-      const delta = t * (0.55 + curve * 0.18) + curve * 1.2;
+      const fy = 2 + ((curve + 1) % 3);
+      const delta = t * (0.65 + curve * 0.2) + curve * 1.15;
       for (let s = 0; s < samples; s++) {
         const u = (s / samples) * Math.PI * 2;
-        const x = cx + Math.sin(fx * u + delta) * (w * 0.42);
-        const y = cy + Math.sin(fy * u) * (h * 0.41);
+        const x = cx + Math.sin(fx * u + delta) * (w * 0.43);
+        const y = cy + Math.sin(fy * u) * (h * 0.42);
         const gc = Math.floor(x / pitch);
         const gr = Math.floor(y / pitch);
         if (gc >= 0 && gc < cols && gr >= 0 && gr < rows) {
           const i = gr * cols + gc;
-          const pulse = 0.55 + 0.45 * Math.sin(u * 4 - t * 3.0);
+          const pulse = 0.6 + 0.4 * Math.sin(u * 5 - t * 3.5);
           if (pulse > lissajousGrid[i]) {
             lissajousGrid[i] = pulse;
-            lissajousPhase[i] = s / samples + curve * 0.35;
+            lissajousPhase[i] = s / samples + curve * 0.3;
           }
         }
       }
     }
   }
 
-  const scanRowY = ((t * 110) % (h + 80)) - 40;
-  const scanColX = ((t * 145) % (w + 80)) - 40;
-  const radarAng = ((t * 1.1) % (Math.PI * 2)) - Math.PI;
+  const scanRowY = ((t * 145) % (h + 80)) - 40;
+  const scanColX = ((t * 185) % (w + 80)) - 40;
+  const radarAng = ((t * 1.45) % (Math.PI * 2)) - Math.PI;
 
   for (let r = 0; r < rows; r++) {
     const py = r * pitch;
@@ -197,76 +191,137 @@ export function renderDiscreteCellPattern(
       let val = 0;
       let phase = 0;
 
-      if (settings.style === 'kaleidoscope') {
+      if (style === 'kaleidoscope') {
         const dist = Math.hypot(dx, dy);
         const normR = dist / Math.max(1, maxR * 0.68);
         const ang = Math.atan2(dy, dx);
         const sector = (Math.PI * 2) / 12;
         const symAng = Math.abs(((ang % sector) + sector) % sector - sector * 0.5);
-        const rose = Math.cos(symAng * 6 + t * 0.9) * Math.sin(normR * 10 - t * 1.6);
-        const ring = Math.cos(normR * 14 - t * 1.2 + Math.cos(symAng * 12) * 1.4);
+        const rose = Math.cos(symAng * 6 + t * 1.15) * Math.sin(normR * 11 - t * 2.1);
+        const ring = Math.cos(normR * 15 - t * 1.5 + Math.cos(symAng * 12) * 1.6);
         const raw = (rose + ring) * 0.5;
-        if (raw > 0.28) {
-          val = (raw - 0.28) / 0.72;
-          phase = normR * 0.8 + symAng * 2.2 + t * 0.08;
+        if (raw > 0.2) {
+          val = (raw - 0.2) / 0.8;
+          phase = normR * 0.9 + symAng * 2.5 + t * 0.12;
         }
-      } else if (settings.style === 'spiral') {
+      } else if (style === 'spiral') {
         const dist = Math.hypot(dx, dy);
         const normR = dist / Math.max(1, maxR * 0.72);
         const ang = Math.atan2(dy, dx);
-        const arms = 4;
-        const s1 = Math.sin(normR * 18 - arms * ang - t * 2.2);
-        const s2 = Math.sin(normR * 10 + 3 * ang + t * 1.1);
-        const raw = s1 * 0.7 + s2 * 0.3;
-        if (raw > 0.34 && normR < 1.15) {
-          val = ((raw - 0.34) / 0.66) * (1 - normR * 0.35);
-          phase = normR * 0.9 + (ang / Math.PI) * 0.5 + t * 0.06;
+        const s1 = Math.sin(normR * 20 - 5 * ang - t * 2.7);
+        const s2 = Math.sin(normR * 12 + 3 * ang + t * 1.4);
+        const raw = s1 * 0.72 + s2 * 0.28;
+        if (raw > 0.24 && normR < 1.18) {
+          val = ((raw - 0.24) / 0.76) * (1 - normR * 0.28);
+          phase = normR + (ang / Math.PI) * 0.5 + t * 0.09;
         }
-      } else if (settings.style === 'lissajous' && lissajousGrid && lissajousPhase) {
+      } else if (style === 'dna_helix') {
+        const nx = (px / Math.max(1, w)) * Math.PI * 4 + t * 1.8;
+        const y1 = cy + Math.sin(nx) * (h * 0.32);
+        const y2 = cy + Math.sin(nx + Math.PI) * (h * 0.32);
+        const d1 = Math.abs(py - y1);
+        const d2 = Math.abs(py - y2);
+        if (d1 < 22) {
+          val = 1 - d1 / 22;
+          phase = nx * 0.15;
+        } else if (d2 < 22) {
+          val = 1 - d2 / 22;
+          phase = nx * 0.15 + 0.5;
+        } else if (c % 3 === 0 && py > Math.min(y1, y2) && py < Math.max(y1, y2)) {
+          val = 0.52;
+          phase = nx * 0.15 + 0.25;
+        }
+      } else if (style === 'matrix_rain') {
+        const colSeed = ((c * 73 + 19) % 31) / 31;
+        const dropSpeed = 12 + colSeed * 18;
+        const headRow = (t * dropSpeed + colSeed * rows * 2) % (rows + 14);
+        const trail = headRow - r;
+        if (trail >= 0 && trail < 14) {
+          val = 1 - trail / 14;
+          phase = trail < 1.5 ? 0.05 : 0.35 + colSeed * 0.4;
+        }
+      } else if (style === 'plasma_lattice') {
+        const vx = px * 0.018;
+        const vy = py * 0.018;
+        const p1 = Math.sin(vx + t * 1.5);
+        const p2 = Math.sin(vy - t * 1.3);
+        const p3 = Math.sin((vx + vy) * 0.8 + t * 1.9);
+        const p4 = Math.sin(Math.hypot(dx, dy) * 0.024 - t * 2.2);
+        const plasma = (p1 + p2 + p3 + p4) * 0.25;
+        if (plasma > 0.16) {
+          val = (plasma - 0.16) / 0.84;
+          phase = plasma * 1.4 + t * 0.12;
+        }
+      } else if (style === 'shockwave') {
+        const dist = Math.hypot(dx, dy);
+        const normR = dist / Math.max(1, maxR * 0.72);
+        const pulse = (t * 0.65) % 1.25;
+        const ringDist = Math.abs(normR - pulse);
+        const ring2Dist = Math.abs(normR - ((pulse + 0.62) % 1.25));
+        const ang = Math.atan2(dy, dx);
+        const rays = Math.pow(Math.max(0, Math.cos(ang * 8 - t * 1.2)), 4);
+        const ringGlow = Math.max(
+          ringDist < 0.12 ? 1 - ringDist / 0.12 : 0,
+          ring2Dist < 0.1 ? (1 - ring2Dist / 0.1) * 0.8 : 0,
+        );
+        val = Math.min(1, ringGlow + rays * 0.45 * (1 - normR * 0.5));
+        phase = normR + t * 0.15;
+      } else if (style === 'fractal_diamond') {
+        const manhattan = Math.abs(dx) + Math.abs(dy);
+        const cheby = Math.max(Math.abs(dx), Math.abs(dy));
+        const band1 = Math.sin(manhattan * 0.032 - t * 2.4);
+        const band2 = Math.cos(cheby * 0.042 + t * 1.8);
+        const xorBit = ((Math.abs(c - Math.floor(cols / 2)) ^ Math.abs(r - Math.floor(rows / 2))) % 5) === 0 ? 0.35 : 0;
+        const raw = (band1 + band2) * 0.42 + xorBit;
+        if (raw > 0.24) {
+          val = Math.min(1, (raw - 0.24) / 0.76);
+          phase = manhattan * 0.002 + t * 0.1;
+        }
+      } else if (style === 'lissajous' && lissajousGrid && lissajousPhase) {
         const idx = r * cols + c;
         val = lissajousGrid[idx];
-        phase = lissajousPhase[idx] + t * 0.08;
-      } else if (settings.style === 'scanline') {
+        phase = lissajousPhase[idx] + t * 0.1;
+      } else if (style === 'scanline') {
         const dist = Math.hypot(dx, dy);
         const ang = Math.atan2(dy, dx);
         const angDiff = Math.abs(Math.atan2(Math.sin(ang - radarAng), Math.cos(ang - radarAng)));
-        const radarGlow = angDiff < 0.26 ? 1 - angDiff / 0.26 : 0;
-        const hGlow = scanDistY < 44 ? 1 - scanDistY / 44 : 0;
+        const radarGlow = angDiff < 0.3 ? 1 - angDiff / 0.3 : 0;
+        const hGlow = scanDistY < 50 ? 1 - scanDistY / 50 : 0;
         const vDist = Math.abs(px - scanColX);
-        const vGlow = vDist < 36 ? (1 - vDist / 36) * 0.7 : 0;
-        const pulse = ((c + r) % 3 === 0 || (c % 4 === 0 && r % 2 === 0)) ? 1 : 0.45;
+        const vGlow = vDist < 42 ? (1 - vDist / 42) * 0.78 : 0;
+        const pulse = (c + r) % 2 === 0 ? 1 : 0.52;
         val = Math.max(radarGlow, hGlow, vGlow) * pulse;
-        phase = dist / Math.max(1, maxR) + t * 0.05;
-      } else if (settings.style === 'wave') {
-        const s1x = cx + Math.cos(t * 0.6) * (w * 0.22);
-        const s1y = cy + Math.sin(t * 0.45) * (h * 0.2);
-        const s2x = cx - Math.cos(t * 0.6) * (w * 0.22);
-        const s2y = cy - Math.sin(t * 0.45) * (h * 0.2);
-        const d1 = Math.hypot(px - s1x, py - s1y) * 0.055;
-        const d2 = Math.hypot(px - s2x, py - s2y) * 0.055;
-        const amp = (Math.sin(d1 - t * 2.8) + Math.sin(d2 - t * 2.8)) * 0.5;
-        if (amp > 0.3) {
-          val = (amp - 0.3) / 0.7;
-          phase = amp * 0.7 + t * 0.06;
+        phase = dist / Math.max(1, maxR) + t * 0.08;
+      } else if (style === 'wave') {
+        const s1x = cx + Math.cos(t * 0.7) * (w * 0.23);
+        const s1y = cy + Math.sin(t * 0.55) * (h * 0.21);
+        const s2x = cx - Math.cos(t * 0.7) * (w * 0.23);
+        const s2y = cy - Math.sin(t * 0.55) * (h * 0.21);
+        const d1 = Math.hypot(px - s1x, py - s1y) * 0.058;
+        const d2 = Math.hypot(px - s2x, py - s2y) * 0.058;
+        const amp = (Math.sin(d1 - t * 3.1) + Math.sin(d2 - t * 3.1)) * 0.5;
+        if (amp > 0.22) {
+          val = (amp - 0.22) / 0.78;
+          phase = amp * 0.8 + t * 0.09;
         }
-      } else if (settings.style === 'vortex') {
+      } else if (style === 'vortex') {
         const dist = Math.hypot(dx, dy);
         const normR = dist / Math.max(1, maxR * 0.68);
         const ang = Math.atan2(dy, dx);
-        const swirl = ang + 3.8 * Math.log(normR + 0.15) - t * 1.4;
-        const band = Math.sin(swirl * 5) * Math.cos(normR * 9 - t * 1.3);
-        if (band > 0.28 && normR < 1.15) {
-          val = ((band - 0.28) / 0.72) * Math.min(1, normR * 2.2 + 0.2);
-          phase = normR + t * 0.1;
+        const swirl = ang + 4.2 * Math.log(normR + 0.14) - t * 1.75;
+        const band = Math.sin(swirl * 5) * Math.cos(normR * 10 - t * 1.6);
+        if (band > 0.2 && normR < 1.18) {
+          val = ((band - 0.2) / 0.8) * Math.min(1, normR * 2.4 + 0.22);
+          phase = normR + t * 0.14;
         }
       }
 
-      if (settings.scanlines && val > 0.05 && scanDistY < 46) {
-        val = Math.min(1, val * (1 + (1 - scanDistY / 46) * 0.75));
+      if (val > 0.05 && scanDistY < 48) {
+        val = Math.min(1, val * (1 + (1 - scanDistY / 48) * 0.78));
       }
 
-      if (val > 0.06) {
-        ctx.fillStyle = cellColor(theme, mode, phase, val * alphaMax);
+      if (val > 0.05) {
+        ctx.fillStyle = cellColor(theme, workload.mode, phase, val * alphaMax);
         ctx.fillRect(px, py, block, block);
       }
     }

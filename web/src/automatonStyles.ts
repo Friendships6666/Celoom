@@ -135,10 +135,10 @@ export function selectDynamicPresets(workload: LiveWorkload, timeSec: number): A
   return chosen;
 }
 
-/** Computes workload-driven intensity & speed (+50% overall speed boost) with fixed density. */
+/** Computes workload-driven intensity & speed (75% slower for smooth, non-strobing motion) with fixed density. */
 export function computeWorkloadDynamics(workload: LiveWorkload): { speed: number; intensity: number } {
   if (workload.mode === 'idle') {
-    return { speed: 1.0, intensity: 0.0 };
+    return { speed: 0.35, intensity: 0.0 };
   }
   const load =
     workload.activeSubagents * 0.55 +
@@ -149,10 +149,10 @@ export function computeWorkloadDynamics(workload: LiveWorkload): { speed: number
   const modeBaseSpeed =
     workload.mode === 'swarm' ? 1.85 : workload.mode === 'tooling' ? 1.55 : 1.3;
   const modeBaseIntensity =
-    workload.mode === 'swarm' ? 1.55 : workload.mode === 'tooling' ? 1.38 : 1.22;
+    workload.mode === 'swarm' ? 1.45 : workload.mode === 'tooling' ? 1.3 : 1.15;
   return {
-    speed: Math.min(5.1, (modeBaseSpeed + load * 0.42) * 1.5),
-    intensity: Math.min(1.9, modeBaseIntensity + load * 0.25),
+    speed: Math.min(1.25, (modeBaseSpeed + load * 0.42) * 1.5 * 0.25),
+    intensity: Math.min(1.75, modeBaseIntensity + load * 0.22),
   };
 }
 
@@ -377,7 +377,7 @@ export function renderDiscreteCellPattern(
           }
         } else if (style === 'matrix_rain') {
           const colSeed = ((c * 73 + 19) % 31) / 31;
-          const dropSpeed = 12 + colSeed * 18;
+          const dropSpeed = 4 + colSeed * 5;
           const headRow = (t * dropSpeed + colSeed * rows * 2) % (rows + 14);
           const trail = headRow - r;
           if (trail >= 0 && trail < 14) {
@@ -537,12 +537,10 @@ export function renderDiscreteCellPattern(
         } else if (style === 'chladni') {
           const nx = (px / Math.max(1, w)) * 2 - 1;
           const ny = (py / Math.max(1, h)) * 2 - 1;
-          const n = 3 + Math.floor((Math.sin(t * 0.35) + 1) * 1.5);
-          const m = 4 + Math.floor((Math.cos(t * 0.28) + 1) * 1.5);
-          const nodal = Math.abs(
-            Math.cos(n * Math.PI * nx) * Math.cos(m * Math.PI * ny) -
-            Math.cos(m * Math.PI * nx) * Math.cos(n * Math.PI * ny),
-          );
+          const mix = 0.5 + 0.5 * Math.sin(t * 0.7);
+          const a1 = Math.cos(3 * Math.PI * nx) * Math.cos(5 * Math.PI * ny) - Math.cos(5 * Math.PI * nx) * Math.cos(3 * Math.PI * ny);
+          const a2 = Math.cos(4 * Math.PI * nx) * Math.cos(7 * Math.PI * ny) - Math.cos(7 * Math.PI * nx) * Math.cos(4 * Math.PI * ny);
+          const nodal = Math.abs(a1 * (1 - mix) + a2 * mix);
           if (nodal < 0.28) {
             val = 1 - nodal / 0.28;
             phase += (nx * nx + ny * ny) * 0.5 + t * 0.1;
@@ -569,10 +567,10 @@ export function renderDiscreteCellPattern(
             phase += iter * 0.18 + t * 0.1;
           }
         } else if (style === 'sierpinski') {
-          const sc = (c + Math.floor(t * 4)) & 63;
-          const sr = (r + Math.floor(t * 2)) & 63;
+          const sc = c & 63;
+          const sr = r & 63;
           if ((sc & sr) === 0) {
-            const wave = 0.5 + 0.5 * Math.sin(normR * 10 - t * 2.5);
+            const wave = 0.5 + 0.5 * Math.sin(normR * 10 - t * 2.2);
             val = 0.35 + wave * 0.65;
             phase += (sc + sr) * 0.012 + t * 0.08;
           }
@@ -602,7 +600,7 @@ export function renderDiscreteCellPattern(
             phase += qv + normR * 0.5 + t * 0.1;
           }
         } else if (style === 'superformula') {
-          const m = 6 + Math.round((Math.sin(t * 0.4) + 1) * 3);
+          const m = 8;
           const n1 = 0.55;
           const n2 = 1.6 + 0.8 * Math.cos(t * 0.7);
           const n3 = 1.6 + 0.8 * Math.sin(t * 0.7);

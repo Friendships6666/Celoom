@@ -118,7 +118,7 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
         toolKinds: frame?.tool_kinds ?? 0,
         energy: frame?.energy ?? 0,
       };
-      const minInterval = workload.mode === 'idle' && smoothIntensity <= 0.02 ? 120 : 28;
+      const minInterval = workload.mode === 'idle' && smoothIntensity <= 0.02 ? 120 : 16;
       if (!reducedMotion && now - lastDraw < minInterval) {
         rafId = window.requestAnimationFrame(draw);
         return;

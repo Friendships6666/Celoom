@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
-
-type AutomatonMode = 'idle' | 'thinking' | 'tooling' | 'swarm';
+import {
+  ANIM_SETTINGS_EVENT,
+  loadAnimSettings,
+  renderVectorOverlay,
+  type AnimationSettings,
+  type AutomatonMode,
+} from './automatonStyles';
 
 interface AutomatonFrame {
   cols: number;
@@ -35,7 +40,21 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
   const decodedRef = useRef<Uint8Array>(new Uint8Array(0));
   const displayRef = useRef<Float32Array>(new Float32Array(0));
   const themeRef = useRef(theme);
+  const settingsRef = useRef<AnimationSettings>(loadAnimSettings());
   themeRef.current = theme;
+
+  useEffect(() => {
+    const sync = (ev?: Event) => {
+      const detail = (ev as CustomEvent<AnimationSettings> | undefined)?.detail;
+      settingsRef.current = detail ?? loadAnimSettings();
+    };
+    window.addEventListener(ANIM_SETTINGS_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(ANIM_SETTINGS_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
 
   useEffect(() => {
     if (!authenticated) {
@@ -90,7 +109,7 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
 
     const resize = () => {
       const aspect = window.innerHeight > 0 ? window.innerWidth / window.innerHeight : 16 / 9;
-      const w = Math.min(window.innerWidth, 960);
+      const w = Math.min(window.innerWidth, 1200);
       const h = Math.max(1, Math.round(w / Math.max(0.25, aspect)));
       canvas.width = Math.max(1, w);
       canvas.height = Math.max(1, h);
@@ -103,64 +122,74 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
         rafId = 0;
         return;
       }
+      const settings = settingsRef.current;
       const frame = frameRef.current;
-      const mode: AutomatonMode = frame?.mode ?? 'idle';
-      const minInterval = mode === 'idle' ? 45 : 32;
+      const mode: AutomatonMode = settings.previewMode !== 'live' ? settings.previewMode : (frame?.mode ?? 'idle');
+      const minInterval = settings.style === 'off' ? 250 : mode === 'idle' ? 32 : 24;
       if (!reducedMotion && now - lastDraw < minInterval) {
         rafId = window.requestAnimationFrame(draw);
         return;
       }
       lastDraw = now;
 
-      const cols = frame?.cols ?? 28;
-      const rows = frame?.rows ?? 16;
-      const total = cols * rows;
-      const needed = total * 3;
-
-      if (offCanvas.width !== cols || offCanvas.height !== rows || !imgData || !rgba32) {
-        offCanvas.width = cols;
-        offCanvas.height = rows;
-        imgData = offCtx.createImageData(cols, rows);
-        rgba32 = new Uint32Array(imgData.data.buffer);
-      }
-
-      if (displayRef.current.length !== needed) {
-        displayRef.current = new Float32Array(needed);
-      }
-      const target = decodedRef.current;
-      const disp = displayRef.current;
-      const lerpRate = mode === 'idle' ? 0.24 : 0.38;
-      if (target.length === needed) {
-        for (let i = 0; i < needed; i++) {
-          disp[i] += (target[i] - disp[i]) * lerpRate;
-        }
-      }
-
-      const isDark = themeRef.current === 'dark';
-      const maxAlpha = isDark
-        ? (mode === 'idle' ? 0.44 : mode === 'thinking' ? 0.56 : 0.64)
-        : (mode === 'idle' ? 0.24 : mode === 'thinking' ? 0.30 : 0.36);
-
-      for (let i = 0; i < total; i++) {
-        const base = i * 3;
-        const r = Math.min(255, Math.max(0, Math.round(disp[base])));
-        const g = Math.min(255, Math.max(0, Math.round(disp[base + 1])));
-        const b = Math.min(255, Math.max(0, Math.round(disp[base + 2])));
-        const peak = r > g ? (r > b ? r : b) : (g > b ? g : b);
-        if (peak <= 4) {
-          rgba32[i] = 0;
-        } else {
-          const t = peak / 255;
-          const alpha = Math.round((0.04 + Math.pow(t, 0.82) * maxAlpha) * 255);
-          rgba32[i] = packRgba(r, g, b, alpha);
-        }
-      }
-
-      offCtx.putImageData(imgData, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(offCanvas, 0, 0, canvas.width, canvas.height);
+
+      if (settings.style !== 'off') {
+        const cols = frame?.cols ?? 28;
+        const rows = frame?.rows ?? 16;
+        const total = cols * rows;
+        const needed = total * 3;
+
+        if (offCanvas.width !== cols || offCanvas.height !== rows || !imgData || !rgba32) {
+          offCanvas.width = cols;
+          offCanvas.height = rows;
+          imgData = offCtx.createImageData(cols, rows);
+          rgba32 = new Uint32Array(imgData.data.buffer);
+        }
+
+        if (displayRef.current.length !== needed) {
+          displayRef.current = new Float32Array(needed);
+        }
+        const target = decodedRef.current;
+        const disp = displayRef.current;
+        const lerpRate = mode === 'idle' ? 0.24 : 0.38;
+        if (target.length === needed) {
+          for (let i = 0; i < needed; i++) {
+            disp[i] += (target[i] - disp[i]) * lerpRate;
+          }
+        }
+
+        const isDark = themeRef.current === 'dark';
+        const styleDim = settings.style === 'cellular' ? 1.0 : 0.65;
+        const maxAlpha = (isDark
+          ? (mode === 'idle' ? 0.42 : mode === 'thinking' ? 0.54 : 0.62)
+          : (mode === 'idle' ? 0.22 : mode === 'thinking' ? 0.28 : 0.34)) * styleDim * settings.intensity;
+
+        for (let i = 0; i < total; i++) {
+          const base = i * 3;
+          const r = Math.min(255, Math.max(0, Math.round(disp[base])));
+          const g = Math.min(255, Math.max(0, Math.round(disp[base + 1])));
+          const b = Math.min(255, Math.max(0, Math.round(disp[base + 2])));
+          const peak = r > g ? (r > b ? r : b) : (g > b ? g : b);
+          if (peak <= 4) {
+            rgba32[i] = 0;
+          } else {
+            const t = peak / 255;
+            const alpha = Math.min(255, Math.round((0.03 + Math.pow(t, 0.82) * maxAlpha) * 255));
+            rgba32[i] = packRgba(r, g, b, alpha);
+          }
+        }
+
+        offCtx.putImageData(imgData, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(offCanvas, 0, 0, canvas.width, canvas.height);
+
+        const energy = settings.previewMode !== 'live'
+          ? (mode === 'swarm' ? 1.0 : mode === 'tooling' ? 0.8 : mode === 'thinking' ? 0.55 : 0.25)
+          : (frame?.energy ?? 0.25);
+        renderVectorOverlay(ctx, canvas.width, canvas.height, now * 0.001, mode, energy, themeRef.current, settings);
+      }
 
       if (!reducedMotion) {
         rafId = window.requestAnimationFrame(draw);
@@ -182,4 +211,47 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
   }, []);
 
   return <canvas ref={canvasRef} className="automaton-bg" aria-hidden="true" />;
+}
+
+export function AutomatonPreview({ settings, theme }: { settings: AnimationSettings; theme: 'light' | 'dark' }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const settingsRef = useRef(settings);
+  const themeRef = useRef(theme);
+  settingsRef.current = settings;
+  themeRef.current = theme;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+    let rafId = 0;
+    const draw = (now: number) => {
+      const s = settingsRef.current;
+      const mode: AutomatonMode = s.previewMode === 'live' ? 'thinking' : s.previewMode;
+      const energy = mode === 'swarm' ? 1.0 : mode === 'tooling' ? 0.8 : mode === 'thinking' ? 0.55 : 0.25;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (s.style === 'cellular') {
+        // Synthetic preview grid when backend cellular mode is selected.
+        const cols = 28;
+        const rows = 14;
+        const cw = canvas.width / cols;
+        const ch = canvas.height / rows;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const v = 0.5 + 0.5 * Math.sin(c * 0.45 + now * 0.002 * s.speed) * Math.cos(r * 0.5 - now * 0.0016 * s.speed);
+            const hue = (185 + (c * 7 + r * 11 + now * 0.02)) % 360;
+            ctx.fillStyle = `hsla(${hue}, 82%, 58%, ${(v * 0.5 * s.intensity).toFixed(3)})`;
+            ctx.fillRect(c * cw, r * ch, cw + 0.5, ch + 0.5);
+          }
+        }
+      }
+      renderVectorOverlay(ctx, canvas.width, canvas.height, now * 0.001, mode, energy, themeRef.current, s);
+      rafId = window.requestAnimationFrame(draw);
+    };
+    rafId = window.requestAnimationFrame(draw);
+    return () => window.cancelAnimationFrame(rafId);
+  }, []);
+
+  return <canvas ref={canvasRef} width={640} height={240} className="anim-preview-canvas" />;
 }

@@ -1,6 +1,8 @@
 import { QualityChecks } from './QualityChecks';
 import { useEffect, useState, type FormEvent } from 'react';
-import { ChevronRight, GitBranch, Globe2, KeyRound, LockKeyhole, Network, Plus, Save, Search, ShieldCheck, Trash2, Zap } from 'lucide-react';
+import { ChevronRight, GitBranch, Globe2, KeyRound, LockKeyhole, Network, Plus, RotateCcw, Save, Search, ShieldCheck, Sparkles, Trash2, Zap } from 'lucide-react';
+import { AutomatonPreview } from './AutomatonBg';
+import { ANIMATION_STYLES, DEFAULT_ANIM_SETTINGS, loadAnimSettings, saveAnimSettings, type AnimationSettings } from './automatonStyles';
 import { api, ApiError, errorMessage, sanitizeConfig } from './api';
 import { Alert, Field, Modal, ModelSelect, Spinner, Toggle } from './ui';
 import { defaultSearchConfig, modelOptions, sameSelection, type ApiKey, type AppConfig, type Diagnostic, type ModelConfig, type NetworkConfig, type SearchConfig, type Selection, type Site, type SubagentModel } from './types';
@@ -45,7 +47,7 @@ export function Settings({ config, onSaved, onClose, onLoggedOut }: { config: Ap
   const [qualitySelection, setQualitySelection] = useState<{ selection: Selection; name: string } | null>(null);
   const [draft, setDraft] = useState<AppConfig>(() => clone(config));
   const [baseline, setBaseline] = useState(() => JSON.stringify(clone(config)));
-  const [tab, setTab] = useState<'models' | 'subagents' | 'network' | 'security'>('models');
+  const [tab, setTab] = useState<'models' | 'subagents' | 'network' | 'animation' | 'security'>('models');
   const [siteId, setSiteId] = useState(config.sites[0]?.id ?? '');
   const [keyId, setKeyId] = useState('');
   const [modelId, setModelId] = useState('');
@@ -103,6 +105,7 @@ export function Settings({ config, onSaved, onClose, onLoggedOut }: { config: Ap
       <button className={tab === 'models' ? 'active' : ''} onClick={() => setTab('models')}><Globe2 size={17} />模型连接</button>
       <button className={tab === 'subagents' ? 'active' : ''} onClick={() => setTab('subagents')}><GitBranch size={17} />子代理</button>
       <button className={tab === 'network' ? 'active' : ''} onClick={() => setTab('network')}><Network size={17} />网络与诊断</button>
+      <button className={tab === 'animation' ? 'active' : ''} onClick={() => setTab('animation')}><Sparkles size={17} />背景动画</button>
       <button className={tab === 'security' ? 'active' : ''} onClick={() => setTab('security')}><ShieldCheck size={17} />安全</button>
     </nav>
     <div className="settings-scroll">
@@ -135,6 +138,7 @@ export function Settings({ config, onSaved, onClose, onLoggedOut }: { config: Ap
       </div>}
       {tab === 'subagents' && <SubagentSettings config={draft} onChange={subagent_models => { setDraft(d => ({ ...d, subagent_models })); setNotice(''); }} />}
       {tab === 'network' && <NetworkSettings network={draft.network} onChange={network => setDraft(d => ({ ...d, network }))} search={draft.search ?? defaultSearchConfig()} onSearchChange={changeSearch} saved={config} dirty={dirty} />}
+      {tab === 'animation' && <AnimationSettingsPanel />}
       {tab === 'security' && <SecuritySettings onLoggedOut={onLoggedOut} />}
       </fieldset>
     </div>
@@ -223,4 +227,57 @@ function SecuritySettings({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   async function submit(event: FormEvent) { event.preventDefault(); setError(''); if (new TextEncoder().encode(next).length < 12) { setError('新密码至少需要 12 字节。'); return; } if (next !== confirmPassword) { setError('两次输入的新密码不一致。'); return; } setBusy(true); try { await api.password(current, next); setCurrent(''); setNext(''); setConfirmPassword(''); onLoggedOut(); } catch (reason) { setError(errorMessage(reason)); } finally { setBusy(false); } }
   return <div className="security-settings"><div className="security-emblem"><LockKeyhole size={28} /></div><h3>保护你的工作台</h3><p className="muted">修改密码后，所有设备上的登录会话将立即失效。</p><form onSubmit={event => void submit(event)} className="password-form">{error && <Alert>{error}</Alert>}<Field label="当前密码"><input required type="password" autoComplete="current-password" value={current} onChange={e => setCurrent(e.target.value)} /></Field><Field label="新密码"><input required type="password" autoComplete="new-password" value={next} onChange={e => setNext(e.target.value)} /></Field><Field label="再次输入新密码"><input required type="password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></Field><button className="button primary" disabled={busy}>{busy ? <Spinner label="更新中" /> : <><ShieldCheck size={16} />更新密码并退出</>}</button></form><p className="security-note"><ShieldCheck size={15} />密码与 API Key 从不写入浏览器本地存储。</p></div>;
+}
+
+function AnimationSettingsPanel() {
+  const [anim, setAnim] = useState<AnimationSettings>(() => loadAnimSettings());
+  const theme: 'light' | 'dark' = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  function update(patch: Partial<AnimationSettings>) {
+    const next = { ...anim, ...patch };
+    setAnim(next);
+    saveAnimSettings(next);
+  }
+  return <section className="anim-settings" aria-label="背景动画设置">
+    <div className="section-heading">
+      <div><p className="section-eyebrow">ANIMATION / 数学细胞动画</p><h3>实时背景渲染与调试</h3><p className="muted">选择动画样式并实时调整速度、密度与扫描线，主背景与下方预览同步生效。</p></div>
+      <button type="button" className="button secondary" onClick={() => { setAnim({ ...DEFAULT_ANIM_SETTINGS }); saveAnimSettings({ ...DEFAULT_ANIM_SETTINGS }); }}><RotateCcw size={14} />恢复默认</button>
+    </div>
+    <div className="anim-preview-box">
+      <AutomatonPreview settings={anim} theme={theme} />
+      <span className="anim-preview-badge">{ANIMATION_STYLES.find(s => s.id === anim.style)?.name} · {anim.previewMode === 'live' ? '跟随实时状态' : anim.previewMode}</span>
+    </div>
+    <div className="anim-style-grid" role="radiogroup" aria-label="动画样式">
+      {ANIMATION_STYLES.map(item => (
+        <button type="button" key={item.id} className={`anim-style-card ${anim.style === item.id ? 'active' : ''}`} onClick={() => update({ style: item.id })}>
+          <div className="anim-style-head"><strong>{item.name}</strong><span>{item.tag}</span></div>
+          <small>{item.desc}</small>
+        </button>
+      ))}
+    </div>
+    <div className="anim-controls-grid">
+      <label className="anim-slider">
+        <span>动画速度 <b>{anim.speed.toFixed(1)}x</b></span>
+        <input type="range" min="0.2" max="3.0" step="0.1" value={anim.speed} onChange={e => update({ speed: Number(e.target.value) })} />
+      </label>
+      <label className="anim-slider">
+        <span>亮度 / 强度 <b>{Math.round(anim.intensity * 100)}%</b></span>
+        <input type="range" min="0.2" max="1.8" step="0.05" value={anim.intensity} onChange={e => update({ intensity: Number(e.target.value) })} />
+      </label>
+      <label className="anim-slider">
+        <span>图形密度 <b>{anim.density.toFixed(1)}x</b></span>
+        <input type="range" min="0.5" max="2.0" step="0.1" value={anim.density} onChange={e => update({ density: Number(e.target.value) })} />
+      </label>
+      <label className="anim-slider">
+        <span>状态模拟预览</span>
+        <select value={anim.previewMode} onChange={e => update({ previewMode: e.target.value as AnimationSettings['previewMode'] })}>
+          <option value="live">跟随真实运行状态</option>
+          <option value="idle">空闲 (idle)</option>
+          <option value="thinking">思考中 (thinking)</option>
+          <option value="tooling">工具调用 (tooling)</option>
+          <option value="swarm">多 Agent 并发 (swarm)</option>
+        </select>
+      </label>
+    </div>
+    <Toggle label="叠加赛博扫描线" hint="在任意动画样式上方叠加精细扫描线与移动光束。" checked={anim.scanlines} onChange={scanlines => update({ scanlines })} />
+  </section>;
 }

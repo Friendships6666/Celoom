@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import {
   renderDiscreteCellPattern,
-  selectDynamicPreset,
+  selectDynamicPresets,
   type AnimationStyleId,
   type AutomatonMode,
   type LiveWorkload,
@@ -118,13 +118,13 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
       // Background is completely blank when idle (not working/thinking).
       if (workload.mode !== 'idle') {
         const tSec = now * 0.001;
-        const style = selectDynamicPreset(workload, tSec);
+        const styles = selectDynamicPresets(workload, tSec);
         renderDiscreteCellPattern(
           ctx,
           canvas.width,
           canvas.height,
           tSec,
-          style,
+          styles,
           workload,
           themeRef.current,
           decodedRef.current,
@@ -177,10 +177,10 @@ export function AutomatonPreview({
     const draw = (now: number) => {
       const { style: sel, workload: wl, theme: th } = propsRef.current;
       const tSec = now * 0.001;
-      const activeStyle = sel === 'auto' ? selectDynamicPreset(wl, tSec) : sel;
+      const activeStyles = sel === 'auto' ? selectDynamicPresets(wl, tSec) : [sel];
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (activeStyle === 'cellular' && wl.mode !== 'idle') {
+      if (activeStyles.includes('cellular') && wl.mode !== 'idle') {
         const cols = 28;
         const rows = 14;
         const fake = new Uint8Array(cols * rows * 3);
@@ -193,9 +193,9 @@ export function AutomatonPreview({
             fake[i + 2] = Math.round(255 * v);
           }
         }
-        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, tSec, activeStyle, wl, th, fake, cols, rows);
+        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, tSec, activeStyles, wl, th, fake, cols, rows);
       } else {
-        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, tSec, activeStyle, wl, th);
+        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, tSec, activeStyles, wl, th);
       }
       rafId = window.requestAnimationFrame(draw);
     };

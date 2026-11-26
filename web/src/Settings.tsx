@@ -272,8 +272,8 @@ function AnimationSettingsPanel() {
     </div>
     <div className="anim-style-grid" role="radiogroup" aria-label="动画预设预览">
       <button type="button" className={`anim-style-card ${selectedStyle === 'auto' ? 'active' : ''}`} onClick={() => setSelectedStyle('auto')}>
-        <div className="anim-style-head"><strong>自动动态切换</strong><span>Workload Auto</span></div>
-        <small>根据当前运行模式自动轮换匹配的高能离散细胞预设</small>
+        <div className="anim-style-head"><strong>自动动态混合</strong><span>50%双 / 30%三混合</span></div>
+        <small>存在后台任务或子代理时 50% 触发双预设混合、30% 触发三预设叠加</small>
       </button>
       {ANIMATION_STYLES.map(item => (
         <button type="button" key={item.id} className={`anim-style-card ${selectedStyle === item.id ? 'active' : ''}`} onClick={() => setSelectedStyle(item.id)}>

@@ -16,6 +16,16 @@ export type AnimationStyleId =
   | 'cyber_orbit'
   | 'starburst'
   | 'heartbeat'
+  | 'moire'
+  | 'hyperbolic'
+  | 'voronoi'
+  | 'chladni'
+  | 'torus_knot'
+  | 'julia_fractal'
+  | 'sierpinski'
+  | 'magnetic_dipole'
+  | 'quasicrystal'
+  | 'superformula'
   | 'cellular';
 
 export interface LiveWorkload {
@@ -48,12 +58,31 @@ export const ANIMATION_STYLES: ReadonlyArray<{
   { id: 'scanline', name: '扫描线细胞矩阵', tag: 'Radar + Scan', desc: '横纵强扫描光束与旋转雷达细胞阵' },
   { id: 'wave', name: '波纹干涉细胞', tag: 'Wave Field', desc: '多波源相干驻波等值离散细胞块' },
   { id: 'vortex', name: '旋涡细胞流', tag: 'Vortex Cells', desc: '极坐标强涡旋角动量离散细胞簇' },
+  { id: 'moire', name: '莫尔条纹干涉', tag: 'Moiré Beat', desc: '双旋转晶格叠加产生的动态几何莫尔拍频' },
+  { id: 'hyperbolic', name: '双曲庞加莱圆盘', tag: 'Poincaré Disk', desc: '非欧几何双曲共形映射与测地线细胞铺砌' },
+  { id: 'voronoi', name: '泰森晶界网络', tag: 'Voronoi Edges', desc: '动态多核泰森多边形晶体边界脉冲细胞' },
+  { id: 'chladni', name: '克拉尼声学驻波', tag: 'Chladni Nodal', desc: '二维弹性板高阶谐波共振节点几何图形' },
+  { id: 'torus_knot', name: '三维环面扭结', tag: 'Torus Knot 3D', desc: '(3,5) 环面扭结三维投影与景深呼吸细胞' },
+  { id: 'julia_fractal', name: '动态朱利亚分形', tag: 'Julia Set', desc: '复平面迭代逃逸等势线实时分形细胞阵' },
+  { id: 'sierpinski', name: '谢尔宾斯基分形', tag: 'Bitwise Fractal', desc: '位运算自相似分形地毯与递归脉冲网格' },
+  { id: 'magnetic_dipole', name: '偶极磁场磁感线', tag: 'Dipole Flux', desc: '双磁极磁通量线与沿线流动的量子细胞' },
+  { id: 'quasicrystal', name: '五重彭罗斯准晶', tag: '5-Fold Penrose', desc: '五维平面波叠加的非周期准晶体对称图案' },
+  { id: 'superformula', name: '超级公式几何星花', tag: 'Gielis Formula', desc: '广义超椭圆参数方程演化的星形几何细胞' },
   { id: 'cellular', name: '经典元胞矩阵', tag: '256-Color CA', desc: '后端实时 256 色离散元胞方块阵' },
 ];
 
-const THINKING_CYCLE: AnimationStyleId[] = ['spiral', 'dna_helix', 'cyber_orbit', 'lissajous', 'aurora', 'kaleidoscope'];
-const TOOLING_CYCLE: AnimationStyleId[] = ['scanline', 'matrix_rain', 'wave', 'plasma_lattice', 'heartbeat', 'aurora'];
-const SWARM_CYCLE: AnimationStyleId[] = ['shockwave', 'vortex', 'fractal_diamond', 'starburst', 'kaleidoscope', 'plasma_lattice', 'cyber_orbit'];
+const THINKING_CYCLE: AnimationStyleId[] = [
+  'spiral', 'dna_helix', 'cyber_orbit', 'lissajous', 'aurora',
+  'hyperbolic', 'torus_knot', 'chladni', 'quasicrystal', 'superformula',
+];
+const TOOLING_CYCLE: AnimationStyleId[] = [
+  'scanline', 'matrix_rain', 'wave', 'plasma_lattice', 'heartbeat',
+  'moire', 'voronoi', 'sierpinski', 'magnetic_dipole',
+];
+const SWARM_CYCLE: AnimationStyleId[] = [
+  'shockwave', 'vortex', 'fractal_diamond', 'starburst', 'kaleidoscope',
+  'julia_fractal', 'quasicrystal', 'superformula', 'torus_knot', 'voronoi',
+];
 
 function slotHash(slot: number): number {
   let x = (slot + 1) * 0x9e3779b1;
@@ -226,6 +255,65 @@ export function renderDiscreteCellPattern(
   const s1y = cy + Math.sin(t * 0.55) * (h * 0.21);
   const s2x = cx - Math.cos(t * 0.7) * (w * 0.23);
   const s2y = cy - Math.sin(t * 0.55) * (h * 0.21);
+
+  // Precompute Voronoi seeds & 3D Torus Knot grid if active.
+  let voronoiSeeds: Array<[number, number]> | null = null;
+  if (styles.includes('voronoi')) {
+    voronoiSeeds = [];
+    for (let i = 0; i < 10; i++) {
+      const a = i * 2.39996 + t * (0.45 + (i % 3) * 0.18);
+      const rad = 0.18 + 0.26 * Math.sin(t * 0.6 + i);
+      voronoiSeeds.push([cx + Math.cos(a) * w * rad, cy + Math.sin(a * 1.15) * h * rad]);
+    }
+  }
+
+  let torusGrid: Float32Array | null = null;
+  let torusPhase: Float32Array | null = null;
+  if (styles.includes('torus_knot')) {
+    torusGrid = new Float32Array(cols * rows);
+    torusPhase = new Float32Array(cols * rows);
+    const p = 3;
+    const q = 5;
+    const samples = 260;
+    const rotY = t * 0.7;
+    const rotX = t * 0.45;
+    const cY = Math.cos(rotY);
+    const sY = Math.sin(rotY);
+    const cX = Math.cos(rotX);
+    const sX = Math.sin(rotX);
+    const scale = Math.min(w, h) * 0.14;
+    for (let s = 0; s < samples; s++) {
+      const phi = (s / samples) * Math.PI * 2;
+      const rr = 2.0 + Math.cos(q * phi);
+      const x0 = rr * Math.cos(p * phi);
+      const y0 = rr * Math.sin(p * phi);
+      const z0 = -Math.sin(q * phi);
+      const x1 = x0 * cY - z0 * sY;
+      const z1 = x0 * sY + z0 * cY;
+      const y2 = y0 * cX - z1 * sX;
+      const z2 = y0 * sX + z1 * cX;
+      const persp = 1 / (1 + z2 * 0.12);
+      const sx = cx + x1 * scale * persp;
+      const sy = cy + y2 * scale * persp;
+      const gc = Math.floor(sx / pitch);
+      const gr = Math.floor(sy / pitch);
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          const nc = gc + dc;
+          const nr = gr + dr;
+          if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) {
+            const d = Math.abs(dc) + Math.abs(dr);
+            const val = (d === 0 ? 1.0 : 0.45) * Math.min(1, Math.max(0.35, persp));
+            const idx = nr * cols + nc;
+            if (val > torusGrid[idx]) {
+              torusGrid[idx] = val;
+              torusPhase[idx] = s / samples + z2 * 0.1;
+            }
+          }
+        }
+      }
+    }
+  }
 
   for (let r = 0; r < rows; r++) {
     const py = r * pitch;
@@ -400,6 +488,129 @@ export function renderDiscreteCellPattern(
           if (band > 0.2 && normR < 1.18) {
             val = ((band - 0.2) / 0.8) * Math.min(1, normR * 2.4 + 0.22);
             phase += normR + t * 0.14;
+          }
+        } else if (style === 'moire') {
+          const a1 = t * 0.32;
+          const a2 = -t * 0.27 + 0.25;
+          const u1 = dx * Math.cos(a1) - dy * Math.sin(a1);
+          const v1 = dx * Math.sin(a1) + dy * Math.cos(a1);
+          const u2 = dx * Math.cos(a2) - dy * Math.sin(a2);
+          const v2 = dx * Math.sin(a2) + dy * Math.cos(a2);
+          const g1 = Math.cos(u1 * 0.095) * Math.cos(v1 * 0.095);
+          const g2 = Math.cos(u2 * 0.102) * Math.cos(v2 * 0.102);
+          const beat = (g1 + g2) * 0.5;
+          if (beat > 0.24) {
+            val = (beat - 0.24) / 0.76;
+            phase += normR * 0.7 + beat * 0.5 + t * 0.1;
+          }
+        } else if (style === 'hyperbolic') {
+          const hr = Math.min(0.96, dist / Math.max(1, Math.min(cx, cy) * 0.96));
+          if (hr < 0.96) {
+            const hypDist = Math.log((1 + hr) / (1 - hr));
+            const pattern = Math.cos(hypDist * 4.5 - t * 2.2) * Math.cos(ang * 7 + hypDist * 1.5 + t * 0.8);
+            if (pattern > 0.18) {
+              val = ((pattern - 0.18) / 0.82) * (1 - hr * 0.3);
+              phase += hypDist * 0.22 + t * 0.12;
+            }
+          }
+        } else if (style === 'voronoi' && voronoiSeeds) {
+          let d1 = 1e9;
+          let d2 = 1e9;
+          for (let i = 0; i < voronoiSeeds.length; i++) {
+            const sd = Math.hypot(px - voronoiSeeds[i][0], py - voronoiSeeds[i][1]);
+            if (sd < d1) {
+              d2 = d1;
+              d1 = sd;
+            } else if (sd < d2) {
+              d2 = sd;
+            }
+          }
+          const edge = d2 - d1;
+          if (edge < 24) {
+            val = 1 - edge / 24;
+            phase += d1 * 0.004 + t * 0.1;
+          }
+        } else if (style === 'chladni') {
+          const nx = (px / Math.max(1, w)) * 2 - 1;
+          const ny = (py / Math.max(1, h)) * 2 - 1;
+          const n = 3 + Math.floor((Math.sin(t * 0.35) + 1) * 1.5);
+          const m = 4 + Math.floor((Math.cos(t * 0.28) + 1) * 1.5);
+          const nodal = Math.abs(
+            Math.cos(n * Math.PI * nx) * Math.cos(m * Math.PI * ny) -
+            Math.cos(m * Math.PI * nx) * Math.cos(n * Math.PI * ny),
+          );
+          if (nodal < 0.28) {
+            val = 1 - nodal / 0.28;
+            phase += (nx * nx + ny * ny) * 0.5 + t * 0.1;
+          }
+        } else if (style === 'torus_knot' && torusGrid && torusPhase) {
+          const idx = r * cols + c;
+          val = torusGrid[idx];
+          phase += torusPhase[idx] + t * 0.1;
+        } else if (style === 'julia_fractal') {
+          let zx = (dx / Math.max(1, Math.min(w, h) * 0.42)) * 1.35;
+          let zy = (dy / Math.max(1, Math.min(w, h) * 0.42)) * 1.35;
+          const jcx = -0.74 + 0.14 * Math.cos(t * 0.65);
+          const jcy = 0.22 + 0.14 * Math.sin(t * 0.52);
+          let iter = 0;
+          for (; iter < 7; iter++) {
+            const x2 = zx * zx - zy * zy + jcx;
+            const y2 = 2 * zx * zy + jcy;
+            zx = x2;
+            zy = y2;
+            if (zx * zx + zy * zy > 6) break;
+          }
+          if (iter >= 3 && iter < 7) {
+            val = (iter - 2) / 5;
+            phase += iter * 0.18 + t * 0.1;
+          }
+        } else if (style === 'sierpinski') {
+          const sc = (c + Math.floor(t * 4)) & 63;
+          const sr = (r + Math.floor(t * 2)) & 63;
+          if ((sc & sr) === 0) {
+            const wave = 0.5 + 0.5 * Math.sin(normR * 10 - t * 2.5);
+            val = 0.35 + wave * 0.65;
+            phase += (sc + sr) * 0.012 + t * 0.08;
+          }
+        } else if (style === 'magnetic_dipole') {
+          const p1x = cx - w * 0.16;
+          const p2x = cx + w * 0.16;
+          const d1 = Math.max(12, Math.hypot(px - p1x, py - cy));
+          const d2 = Math.max(12, Math.hypot(px - p2x, py - cy));
+          const a1 = Math.atan2(py - cy, px - p1x);
+          const a2 = Math.atan2(py - cy, px - p2x);
+          const flux = Math.sin((a1 - a2) * 6 + t * 2.2) * Math.cos((d1 - d2) * 0.035 - t * 1.8);
+          if (flux > 0.25) {
+            val = (flux - 0.25) / 0.75;
+            phase += (a1 - a2) * 0.3 + t * 0.1;
+          }
+        } else if (style === 'quasicrystal') {
+          const qx = dx * 0.045;
+          const qy = dy * 0.045;
+          let sum = 0;
+          for (let k = 0; k < 5; k++) {
+            const ka = (k * Math.PI * 2) / 5;
+            sum += Math.cos(qx * Math.cos(ka) + qy * Math.sin(ka) + t * 1.4);
+          }
+          const qv = sum / 5;
+          if (qv > 0.16) {
+            val = (qv - 0.16) / 0.84;
+            phase += qv + normR * 0.5 + t * 0.1;
+          }
+        } else if (style === 'superformula') {
+          const m = 6 + Math.round((Math.sin(t * 0.4) + 1) * 3);
+          const n1 = 0.55;
+          const n2 = 1.6 + 0.8 * Math.cos(t * 0.7);
+          const n3 = 1.6 + 0.8 * Math.sin(t * 0.7);
+          const term1 = Math.pow(Math.abs(Math.cos((m * ang) / 4)), n2);
+          const term2 = Math.pow(Math.abs(Math.sin((m * ang) / 4)), n3);
+          const superR = Math.pow(term1 + term2, -1 / n1) * 0.55;
+          const diff = Math.abs(normR - superR * (0.65 + 0.35 * Math.sin(t * 1.5)));
+          const shell = Math.abs((normR % 0.32) - superR * 0.22);
+          const d = Math.min(diff, shell);
+          if (d < 0.1) {
+            val = 1 - d / 0.1;
+            phase += normR + ang * 0.2 + t * 0.12;
           }
         }
 

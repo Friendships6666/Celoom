@@ -239,12 +239,12 @@ function AnimationSettingsPanel() {
   }
   return <section className="anim-settings" aria-label="背景动画设置">
     <div className="section-heading">
-      <div><p className="section-eyebrow">ANIMATION / 数学细胞动画</p><h3>实时背景渲染与调试</h3><p className="muted">选择动画样式并实时调整速度、密度与扫描线，主背景与下方预览同步生效。</p></div>
+      <div><p className="section-eyebrow">ANIMATION / 离散细胞动画</p><h3>实时背景渲染与调试</h3><p className="muted">全部采用离散细胞方块矩阵渲染；空闲时背景完全隐藏，仅在思考/工作/并发时激活。</p></div>
       <button type="button" className="button secondary" onClick={() => { setAnim({ ...DEFAULT_ANIM_SETTINGS }); saveAnimSettings({ ...DEFAULT_ANIM_SETTINGS }); }}><RotateCcw size={14} />恢复默认</button>
     </div>
     <div className="anim-preview-box">
       <AutomatonPreview settings={anim} theme={theme} />
-      <span className="anim-preview-badge">{ANIMATION_STYLES.find(s => s.id === anim.style)?.name} · {anim.previewMode === 'live' ? '跟随实时状态' : anim.previewMode}</span>
+      <span className="anim-preview-badge">{ANIMATION_STYLES.find(s => s.id === anim.style)?.name} · {anim.previewMode === 'live' ? '空闲隐藏 / 工作激活' : anim.previewMode}</span>
     </div>
     <div className="anim-style-grid" role="radiogroup" aria-label="动画样式">
       {ANIMATION_STYLES.map(item => (

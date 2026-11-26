@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   ANIM_SETTINGS_EVENT,
   loadAnimSettings,
-  renderVectorOverlay,
+  renderDiscreteCellPattern,
   type AnimationSettings,
   type AutomatonMode,
 } from './automatonStyles';
@@ -22,10 +22,6 @@ interface AutomatonFrame {
   cells: string;
 }
 
-function packRgba(r: number, g: number, b: number, a: number): number {
-  return ((a & 255) << 24) | ((b & 255) << 16) | ((g & 255) << 8) | (r & 255);
-}
-
 function hexByte(s: string, offset: number): number {
   const hi = s.charCodeAt(offset);
   const lo = s.charCodeAt(offset + 1);
@@ -38,7 +34,6 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<AutomatonFrame | null>(null);
   const decodedRef = useRef<Uint8Array>(new Uint8Array(0));
-  const displayRef = useRef<Float32Array>(new Float32Array(0));
   const themeRef = useRef(theme);
   const settingsRef = useRef<AnimationSettings>(loadAnimSettings());
   themeRef.current = theme;
@@ -97,12 +92,6 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
-    const offCanvas = document.createElement('canvas');
-    const offCtx = offCanvas.getContext('2d');
-    if (!offCtx) return;
-
-    let imgData: ImageData | null = null;
-    let rgba32: Uint32Array | null = null;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     let rafId = 0;
     let lastDraw = 0;
@@ -125,7 +114,7 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
       const settings = settingsRef.current;
       const frame = frameRef.current;
       const mode: AutomatonMode = settings.previewMode !== 'live' ? settings.previewMode : (frame?.mode ?? 'idle');
-      const minInterval = settings.style === 'off' ? 250 : mode === 'idle' ? 32 : 24;
+      const minInterval = mode === 'idle' || settings.style === 'off' ? 120 : 28;
       if (!reducedMotion && now - lastDraw < minInterval) {
         rafId = window.requestAnimationFrame(draw);
         return;
@@ -134,61 +123,24 @@ export function AutomatonBg({ theme, authenticated }: { theme: 'light' | 'dark';
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (settings.style !== 'off') {
-        const cols = frame?.cols ?? 28;
-        const rows = frame?.rows ?? 16;
-        const total = cols * rows;
-        const needed = total * 3;
-
-        if (offCanvas.width !== cols || offCanvas.height !== rows || !imgData || !rgba32) {
-          offCanvas.width = cols;
-          offCanvas.height = rows;
-          imgData = offCtx.createImageData(cols, rows);
-          rgba32 = new Uint32Array(imgData.data.buffer);
-        }
-
-        if (displayRef.current.length !== needed) {
-          displayRef.current = new Float32Array(needed);
-        }
-        const target = decodedRef.current;
-        const disp = displayRef.current;
-        const lerpRate = mode === 'idle' ? 0.24 : 0.38;
-        if (target.length === needed) {
-          for (let i = 0; i < needed; i++) {
-            disp[i] += (target[i] - disp[i]) * lerpRate;
-          }
-        }
-
-        const isDark = themeRef.current === 'dark';
-        const styleDim = settings.style === 'cellular' ? 1.0 : 0.65;
-        const maxAlpha = (isDark
-          ? (mode === 'idle' ? 0.42 : mode === 'thinking' ? 0.54 : 0.62)
-          : (mode === 'idle' ? 0.22 : mode === 'thinking' ? 0.28 : 0.34)) * styleDim * settings.intensity;
-
-        for (let i = 0; i < total; i++) {
-          const base = i * 3;
-          const r = Math.min(255, Math.max(0, Math.round(disp[base])));
-          const g = Math.min(255, Math.max(0, Math.round(disp[base + 1])));
-          const b = Math.min(255, Math.max(0, Math.round(disp[base + 2])));
-          const peak = r > g ? (r > b ? r : b) : (g > b ? g : b);
-          if (peak <= 4) {
-            rgba32[i] = 0;
-          } else {
-            const t = peak / 255;
-            const alpha = Math.min(255, Math.round((0.03 + Math.pow(t, 0.82) * maxAlpha) * 255));
-            rgba32[i] = packRgba(r, g, b, alpha);
-          }
-        }
-
-        offCtx.putImageData(imgData, 0, 0);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(offCanvas, 0, 0, canvas.width, canvas.height);
-
+      // Show nothing when idle (not working/thinking) or animation is off.
+      if (settings.style !== 'off' && mode !== 'idle') {
         const energy = settings.previewMode !== 'live'
-          ? (mode === 'swarm' ? 1.0 : mode === 'tooling' ? 0.8 : mode === 'thinking' ? 0.55 : 0.25)
-          : (frame?.energy ?? 0.25);
-        renderVectorOverlay(ctx, canvas.width, canvas.height, now * 0.001, mode, energy, themeRef.current, settings);
+          ? (mode === 'swarm' ? 1.0 : mode === 'tooling' ? 0.8 : 0.55)
+          : (frame?.energy ?? 0.45);
+        renderDiscreteCellPattern(
+          ctx,
+          canvas.width,
+          canvas.height,
+          now * 0.001,
+          mode,
+          energy,
+          themeRef.current,
+          settings,
+          decodedRef.current,
+          frame?.cols,
+          frame?.rows,
+        );
       }
 
       if (!reducedMotion) {
@@ -228,25 +180,28 @@ export function AutomatonPreview({ settings, theme }: { settings: AnimationSetti
     let rafId = 0;
     const draw = (now: number) => {
       const s = settingsRef.current;
+      // In Settings preview, if previewMode is 'live', preview with 'thinking' so the user can see the discrete cells clearly.
       const mode: AutomatonMode = s.previewMode === 'live' ? 'thinking' : s.previewMode;
-      const energy = mode === 'swarm' ? 1.0 : mode === 'tooling' ? 0.8 : mode === 'thinking' ? 0.55 : 0.25;
+      const energy = mode === 'swarm' ? 1.0 : mode === 'tooling' ? 0.8 : 0.55;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (s.style === 'cellular') {
-        // Synthetic preview grid when backend cellular mode is selected.
+
+      if (s.style === 'cellular' && mode !== 'idle') {
         const cols = 28;
         const rows = 14;
-        const cw = canvas.width / cols;
-        const ch = canvas.height / rows;
+        const fake = new Uint8Array(cols * rows * 3);
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
-            const v = 0.5 + 0.5 * Math.sin(c * 0.45 + now * 0.002 * s.speed) * Math.cos(r * 0.5 - now * 0.0016 * s.speed);
-            const hue = (185 + (c * 7 + r * 11 + now * 0.02)) % 360;
-            ctx.fillStyle = `hsla(${hue}, 82%, 58%, ${(v * 0.5 * s.intensity).toFixed(3)})`;
-            ctx.fillRect(c * cw, r * ch, cw + 0.5, ch + 0.5);
+            const v = Math.max(0, Math.sin(c * 0.5 + now * 0.0025 * s.speed) * Math.cos(r * 0.55 - now * 0.002 * s.speed));
+            const i = (r * cols + c) * 3;
+            fake[i] = Math.round(40 * v);
+            fake[i + 1] = Math.round(210 * v);
+            fake[i + 2] = Math.round(255 * v);
           }
         }
+        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, now * 0.001, mode, energy, themeRef.current, s, fake, cols, rows);
+      } else {
+        renderDiscreteCellPattern(ctx, canvas.width, canvas.height, now * 0.001, mode, energy, themeRef.current, s);
       }
-      renderVectorOverlay(ctx, canvas.width, canvas.height, now * 0.001, mode, energy, themeRef.current, s);
       rafId = window.requestAnimationFrame(draw);
     };
     rafId = window.requestAnimationFrame(draw);
